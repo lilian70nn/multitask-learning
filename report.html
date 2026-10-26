@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experimental Report</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #ffffff;
+            color: #1e293b;
+            font-family: -apple-system, BlinkMacSystemFont,
+                         "Segoe UI", Arial, sans-serif;
+            line-height: 1.7;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 60px auto;
+            padding: 0 30px;
+        }
+
+        h1 {
+            font-size: 34px;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: #0f172a;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 15px;
+        }
+
+        h2 {
+            font-size: 26px;
+            margin-top: 35px;
+            margin-bottom: 20px;
+            color: #1e293b;
+        }
+
+        h3 {
+            font-size: 20px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: #1e293b;
+        }
+
+        p {
+            font-size: 16px;
+            margin-bottom: 18px;
+            color: #475569;
+        }
+
+        .card {
+            background: transparent;
+            padding: 0;
+            border: none;
+            border-radius: 0;
+            margin-bottom: 35px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 15px;
+        }
+
+        th {
+            background: #eff6ff;
+            color: #1e40af;
+            font-weight: 600;
+            text-align: left;
+            padding: 15px;
+            border-bottom: 2px solid #bfdbfe;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        tr:hover td {
+            background: #f8fafc;
+        }
+
+        .highlight {
+            color: #2563eb;
+            font-weight: 600;
+        }
+
+        .note {
+            background: #f1f5f9;
+            border-left: 4px solid #2563eb;
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-size: 15px;
+            color: #475569;
+        }
+
+        .figure-frame {
+            display: block;
+            width: 100%;
+            border: none;
+        }
+
+        .figure-caption {
+            font-size: 14px;
+            color: #64748b;
+            text-align: center;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        .confusion-wrapper {
+            width: 100%;
+            height: 850px;
+            overflow: hidden;
+        }
+
+        .confusion-frame {
+            display: block;
+            width: 1400px;
+            height: 1250px;
+            border: none;
+            transform: scale(0.67);
+            transform-origin: top left;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                margin: 30px auto;
+                padding: 0 15px;
+            }
+
+            .card {
+                padding: 0;
+                overflow-x: auto;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            h2 {
+                font-size: 23px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- Classification -->
+    <h1>1. Classification</h1>
+
+    <h2>1.1 Experimental Settings</h2>
+
+    <!-- Dataset -->
+    <section class="card">
+
+        <h3>1.1.1 Dataset</h3>
+
+        <p>
+            The experiments were conducted on a gastrointestinal
+            endoscopic image dataset containing
+            <span class="highlight">10,436 images across 16 classes</span>.
+        </p>
+
+        <p>
+            The dataset was divided into training and validation sets
+            using an 85:15 stratified split, resulting in
+            <strong>8,870 training images</strong> and
+            <strong>1,566 validation images</strong>.
+        </p>
+
+        <p>
+            All images were resized to 224 × 224 pixels and normalized
+            using ImageNet statistics. Random horizontal flipping
+            was applied during training.
+        </p>
+
+    </section>
+
+
+    <!-- Experimental Configurations -->
+    <section class="card">
+
+        <h3>1.1.2 Experimental Configurations</h3>
+
+        <p>
+            Four experimental settings were evaluated to investigate
+            the effects of backbone initialization strategies
+            and loss functions.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Setting</th>
+                    <th>Backbone Initialization</th>
+                    <th>Loss Function</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td><strong>1</strong></td>
+                    <td>ImageNet-pretrained ViT-B/16</td>
+                    <td>Cross-Entropy (CE)</td>
+                </tr>
+
+                <tr>
+                    <td><strong>2</strong></td>
+                    <td>ImageNet-pretrained ViT-B/16</td>
+                    <td>Evidential Deep Learning (EDL)</td>
+                </tr>
+
+                <tr>
+                    <td><strong>3</strong></td>
+                    <td>GastroNet DINOv1-pretrained ViT-B/16</td>
+                    <td>Cross-Entropy (CE)</td>
+                </tr>
+
+                <tr>
+                    <td><strong>4</strong></td>
+                    <td>GastroNet DINOv1-pretrained ViT-B/16</td>
+                    <td>Evidential Deep Learning (EDL)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>
+            The ImageNet settings used a ViT-B/16 backbone initialized
+            with supervised ImageNet-pretrained weights.
+        </p>
+
+        <p>
+            The DINOv1 settings used a ViT-B/16 backbone initialized
+            with weights obtained from self-supervised pretraining
+            on GastroNet images.
+        </p>
+
+        <p>
+            For the CE settings, models were optimized using the
+            standard cross-entropy loss.
+            For the EDL settings, a Dirichlet-based evidential loss
+            was used to model classification evidence and estimate
+            predictive uncertainty.
+        </p>
+
+    </section>
+
+
+    <!-- Training Configuration -->
+    <section class="card">
+
+        <h3>1.1.3 Training Configuration</h3>
+
+        <p>
+            All ViT models were fine-tuned using the AdamW optimizer
+            with a learning rate of
+            <span class="highlight">1 × 10⁻⁴</span>
+            and a weight decay of
+            <span class="highlight">1 × 10⁻⁴</span>.
+        </p>
+
+        <p>
+            Training was performed for
+            <strong>15 epochs</strong>
+            with a batch size of
+            <strong>512</strong>.
+        </p>
+
+        <p>
+            The best checkpoint was selected based on the highest
+            validation Macro-F1 score.
+        </p>
+
+        <div class="note">
+            The same dataset split and ViT training configuration
+            were used across all four experimental settings
+            to ensure a consistent comparison.
+        </div>
+
+    </section>
+
+    <!-- Experimental Results -->
+    <h2>1.2 Experimental Results</h2>
+
+    <!-- Training Curves -->
+    <section class="card">
+
+        <h3>1.2.1 Training Curves</h3>
+
+        <p>
+            Figure 1 presents the validation Macro-F1 scores
+            across training epochs for the four experimental
+            configurations. The curves illustrate the
+            convergence behavior and classification performance
+            of different backbone initialization strategies
+            and loss functions.
+        </p>
+
+        <div class="figure-container">
+            <iframe
+                class="figure-frame"
+                src="classification_vit/figures/training_curves.html"
+                title="Interactive Training Curves"
+                height="580"
+                loading="lazy">
+            </iframe>
+
+            <p class="figure-caption">
+                Figure 1. Validation Macro-F1 across training epochs
+                for the four experimental configurations.
+                Hover over the curves to inspect individual values.
+            </p>
+        </div>
+
+    </section>
+
+
+    <!-- Classification Performance -->
+    <section class="card">
+
+        <h3>1.2.2 Classification Performance</h3>
+
+        <p>
+            Table 2 summarizes the final classification performance
+            of the four experimental configurations using
+            Accuracy, Macro-F1, and Weighted-F1.
+        </p>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Accuracy</th>
+                        <th>Macro-F1</th>
+                        <th>Weighted-F1</th>
+                    </tr>
+                </thead>
+
+                <tbody id="classification-results">
+                    <tr>
+                        <td colspan="4">Loading results...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </section>
+
+
+    <!-- Confusion Matrices -->
+    <section class="card">
+
+        <h3>1.2.3 Confusion Matrices</h3>
+
+        <p>
+            Figure 2 presents the confusion matrices for
+            the four experimental configurations.
+            The horizontal axis represents predicted classes,
+            while the vertical axis represents ground-truth classes.
+            Cell colors indicate row-normalized proportions.
+            Hovering over a cell displays the corresponding
+            sample count and percentage.
+        </p>
+
+        <div class="confusion-wrapper">
+            <iframe
+                class="confusion-frame"
+                src="classification_vit/figures/hierarchical_confusion_matrices.html"
+                title="Interactive Confusion Matrices"
+                loading="lazy">
+            </iframe>
+        </div>
+
+        <p class="figure-caption">
+            Figure 2. Row-normalized confusion matrices
+            for the four experimental configurations.
+        </p>
+
+    </section>
+
+    <!-- Segmentation -->
+    <h1>2. Segmentation</h1>
+
+    <h2>2.1 Experimental Settings</h2>
+
+    <!-- Dataset -->
+    <section class="card">
+
+        <h3>2.1.1 Dataset</h3>
+
+        <p>
+            The segmentation experiments were conducted on a dataset
+            of gastrointestinal endoscopic images with corresponding
+            pixel-level segmentation masks.
+            The task was formulated as binary semantic segmentation,
+            distinguishing foreground regions from the background.
+        </p>
+
+        <p>
+            The dataset was randomly divided into training and
+            validation sets using an 85:15 split with a fixed
+            random seed of 42.
+        </p>
+
+        <p>
+            All images and masks were resized to 224 × 224 pixels.
+            Bilinear interpolation was applied to images, while
+            nearest-neighbor interpolation was used for masks
+            to preserve discrete labels.
+            Images were normalized using ImageNet statistics.
+        </p>
+
+        <p>
+            During training, random horizontal and vertical flipping
+            were independently applied with a probability of 0.5.
+            The same spatial transformations were applied to
+            each image and its corresponding mask.
+        </p>
+
+    </section>
+
+
+    <!-- Experimental Configurations -->
+    <section class="card">
+
+        <h3>2.1.2 Experimental Configurations</h3>
+
+        <p>
+            Four experimental configurations were designed to evaluate
+            the effects of backbone initialization and loss functions
+            on segmentation performance.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Setting</th>
+                    <th>Backbone Initialization</th>
+                    <th>Loss Function</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td><strong>1</strong></td>
+                    <td>ImageNet-pretrained ViT-B/16</td>
+                    <td>Cross-Entropy + Dice</td>
+                </tr>
+
+                <tr>
+                    <td><strong>2</strong></td>
+                    <td>ImageNet-pretrained ViT-B/16</td>
+                    <td>Evidential Deep Learning (EDL)</td>
+                </tr>
+
+                <tr>
+                    <td><strong>3</strong></td>
+                    <td>GastroNet DINOv1-pretrained ViT-B/16</td>
+                    <td>Cross-Entropy + Dice</td>
+                </tr>
+
+                <tr>
+                    <td><strong>4</strong></td>
+                    <td>GastroNet DINOv1-pretrained ViT-B/16</td>
+                    <td>Evidential Deep Learning (EDL)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>
+            All configurations used a ViT-B/16 encoder combined
+            with a convolutional segmentation decoder.
+            The encoder extracted patch-level features, which were
+            reshaped into spatial feature maps and progressively
+            upsampled to generate pixel-level predictions.
+        </p>
+
+        <p>
+            The ImageNet configurations initialized the encoder
+            using supervised ImageNet-pretrained weights.
+            The DINOv1 configurations initialized the encoder
+            using self-supervised weights pretrained on GastroNet images.
+        </p>
+
+        <p>
+            For the CE configurations, the training objective combined
+            cross-entropy loss and soft Dice loss.
+            For the EDL configurations, a Dirichlet-based evidential
+            loss was used to model pixel-level classification evidence
+            and estimate predictive uncertainty.
+        </p>
+
+    </section>
+
+
+    <!-- Training Configuration -->
+    <section class="card">
+
+        <h3>2.1.3 Training Configuration</h3>
+
+        <p>
+            All segmentation models were fine-tuned using the AdamW
+            optimizer with a learning rate of
+            <span class="highlight">1 × 10⁻⁴</span>
+            and a weight decay of
+            <span class="highlight">1 × 10⁻⁴</span>.
+        </p>
+
+        <p>
+            Training was performed for
+            <strong>50 epochs</strong>
+            with a batch size of
+            <strong>256</strong>.
+        </p>
+
+        <p>
+            Segmentation performance was evaluated using the
+            Dice coefficient and Intersection over Union (IoU).
+            The best checkpoint was selected based on the highest
+            validation Dice score.
+        </p>
+
+        <div class="note">
+            The same dataset split, encoder-decoder architecture,
+            and training configuration were used across all four
+            experimental settings to ensure a consistent comparison.
+        </div>
+
+    </section>
+
+    <!-- Segmentation Experimental Results -->
+    <h2>2.2 Experimental Results</h2>
+
+    <!-- Training Curves -->
+    <section class="card">
+
+        <h3>2.2.1 Training Curves</h3>
+
+        <p>
+            Figure 3 presents the training and validation loss,
+            validation Dice, and validation IoU across training
+            epochs for the four experimental configurations.
+            These curves illustrate the convergence behavior
+            and segmentation performance of different backbone
+            initialization strategies and loss functions.
+        </p>
+
+        <div class="figure-container">
+            <iframe
+                class="figure-frame"
+                src="segmentation_vit/figures/training_curves.html"
+                title="Interactive Segmentation Training Curves"
+                height="850"
+                loading="lazy">
+            </iframe>
+
+            <p class="figure-caption">
+                Figure 3. Training loss, validation loss,
+                validation Dice, and validation IoU
+                across training epochs.
+                Hover over the curves to inspect individual values.
+            </p>
+        </div>
+
+    </section>
+
+
+    <!-- Segmentation Performance -->
+    <section class="card">
+
+        <h3>2.2.2 Segmentation Performance</h3>
+
+        <p>
+            Table 3 summarizes the segmentation performance
+            of the four experimental configurations.
+            The best checkpoint for each configuration was
+            selected based on the highest validation Dice score.
+            Dice and IoU are reported at the corresponding epoch.
+        </p>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Best Epoch</th>
+                        <th>Dice</th>
+                        <th>IoU</th>
+                    </tr>
+                </thead>
+
+                <tbody id="segmentation-results">
+                    <tr>
+                        <td colspan="4">Loading results...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </section>
+
+
+    <!-- Qualitative Results -->
+    <section class="card">
+
+        <h3>2.2.3 Qualitative Results</h3>
+
+        <p>
+            Figure 4 presents qualitative segmentation results
+            for four validation images.
+            The original images and ground-truth masks are shown
+            alongside the predictions from the four experimental
+            configurations.
+            All models were evaluated on the same images
+            to facilitate visual comparison.
+        </p>
+
+        <div class="figure-container">
+            <img
+                src="segmentation_vit/figures/qualitative_results.png"
+                alt="Qualitative segmentation results"
+                style="display: block; width: 100%; height: auto;">
+
+            <p class="figure-caption">
+                Figure 4. Qualitative comparison of segmentation
+                predictions from the four experimental configurations.
+            </p>
+        </div>
+
+    </section>
+
+
+    <!-- Image Captioning -->
+    <h1>3. Image Captioning</h1>
+
+    <h2>3.1 Model Architecture</h2>
+
+    <section class="card">
+
+        <p>
+            Three image captioning baselines were implemented using
+            ViT-B/16 and Qwen2.5-0.5B.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Baseline</th>
+                    <th>Input Features</th>
+                    <th>Number of Tokens</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td><strong>1</strong></td>
+                    <td>ViT visual features</td>
+                    <td>197</td>
+                </tr>
+
+                <tr>
+                    <td><strong>2</strong></td>
+                    <td>ViT + Classification + Segmentation</td>
+                    <td>262</td>
+                </tr>
+
+                <tr>
+                    <td><strong>3</strong></td>
+                    <td>ViT + Classification + Segmentation + EDL evidence</td>
+                    <td>327</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>
+            The framework loads three independent checkpoints:
+            a pretrained ViT-B/16 encoder, a trained classification
+            model, and a trained segmentation model.
+            Baseline 1 uses only the ViT checkpoint, while
+            Baselines 2 and 3 additionally use the classification
+            and segmentation checkpoints.
+        </p>
+
+        <p>
+            The ViT encoder produces 197 visual tokens.
+            Classification probabilities are projected into one token,
+            while segmentation probability maps are pooled into
+            an 8 × 8 grid to produce 64 tokens.
+            Baseline 3 additionally incorporates 65 evidence tokens
+            from the EDL classification and segmentation models.
+        </p>
+
+        <p>
+            All features are projected into Qwen's embedding dimension
+            using separate linear adapters and concatenated into
+            a single multimodal token sequence.
+            This sequence is passed to Qwen2.5-0.5B as a prefix
+            for autoregressive caption generation.
+        </p>
+
+        <div class="note">
+            The captioning framework has been implemented,
+            and inference has been tested for Baselines 1, 2 and 3.
+            Captioning training has not yet been performed.
+        </div>
+
+    </section>
+
+</div>
+
+
+<script>
+async function loadCSVTable(filePath, tableId, columns) {
+    const tbody = document.getElementById(tableId);
+
+    try {
+        const response = await fetch(filePath);
+
+        if (!response.ok) {
+            throw new Error(`Cannot load ${filePath}`);
+        }
+
+        const text = await response.text();
+
+        const lines = text.trim().split(/\r?\n/);
+        const headers = lines[0].split(",");
+
+        tbody.innerHTML = "";
+
+        for (const line of lines.slice(1)) {
+            if (!line.trim()) continue;
+
+            const values = line.split(",");
+            const row = document.createElement("tr");
+
+            for (const column of columns) {
+                const index = headers.indexOf(column);
+
+                if (index === -1) {
+                    throw new Error(`Missing CSV column: ${column}`);
+                }
+
+                const cell = document.createElement("td");
+                const value = values[index];
+
+                if (
+                    ["Accuracy", "Macro-F1", "Weighted-F1", "Dice", "IoU"].includes(column)
+                ) {
+                    cell.textContent = Number(value).toFixed(4);
+                } else {
+                    cell.textContent = value;
+                }
+
+                row.appendChild(cell);
+            }
+
+            tbody.appendChild(row);
+        }
+
+    } catch (error) {
+        console.error(error);
+        tbody.innerHTML =
+            `<tr><td colspan="${columns.length}">Unable to load results.</td></tr>`;
+    }
+}
+
+loadCSVTable(
+    "classification_vit/figures/hierarchical_performance.csv",
+    "classification-results",
+    ["Model", "Accuracy", "Macro-F1", "Weighted-F1"]
+);
+
+loadCSVTable(
+    "segmentation_vit/figures/segmentation_performance.csv",
+    "segmentation-results",
+    ["Model", "Best Epoch", "Dice", "IoU"]
+);
+</script>
+
+</body>
+
+</html>
