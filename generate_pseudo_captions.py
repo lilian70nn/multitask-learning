@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 
-DATA_DIR = Path("/content/labeled-images")
+DATA_DIR = Path("/content/segmented-images")
 IMAGE_DIR = DATA_DIR / "images"
 MASK_DIR = DATA_DIR / "masks"
 ANNOTATION_FILE = DATA_DIR / "bounding-boxes.json"
