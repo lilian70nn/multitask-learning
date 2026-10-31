@@ -76,8 +76,8 @@ def main():
 
     completed = {row["image_id"] for row in rows if row.get("caption")}
 
-    #for image_id, info in tqdm(annotations.items(), total=len(annotations), desc="Generating captions"):
-    for image_id, info in tqdm(list(annotations.items())[:5], desc="Generating captions"):
+    for image_id, info in tqdm(annotations.items(), total=len(annotations), desc="Generating captions"):
+    #for image_id, info in tqdm(list(annotations.items())[:5], desc="Generating captions"):
         if image_id in completed:
             continue
 
