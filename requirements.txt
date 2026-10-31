@@ -4,3 +4,6 @@ accelerate
 pillow
 pandas
 qwen-vl-utils
+sacrebleu
+bert-score
+tqdm
