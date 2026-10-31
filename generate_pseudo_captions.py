@@ -3,6 +3,7 @@ import torch
 import pandas as pd
 from pathlib import Path
 from PIL import Image
+from tqdm.auto import tqdm
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 
 DATA_DIR = Path("/content/segmented-images")
@@ -34,11 +35,13 @@ def generate_caption(image, overlay, labels, model, processor):
     prompt = (
         f"You are describing a gastrointestinal endoscopy image. "
         f"The first image is the original endoscopy image. "
-        f"The second image is the same image with the ground-truth lesion segmentation highlighted in red. "
-        f"The annotated lesion label is: {label_text}. "
-        f"Write one concise, clinically descriptive English caption describing the visible finding and its location or appearance. "
-        f"Use the provided label and segmentation to identify the annotated finding. "
-        f"Do not invent diagnoses, histology, severity, or other details that cannot be established from the images. "
+        f"The second image shows the same image with the ground-truth segmentation mask highlighted in red. "
+        f"The annotated lesion type is: {label_text}. "
+        f"Write one clinically descriptive English caption of approximately 30–50 words. "
+        f"Describe the annotated lesion type, its location within the image, and its visible appearance, including shape, color, or surface characteristics when identifiable. "
+        f"Focus on the region highlighted by the segmentation mask. "
+        f"Use the provided lesion label as the ground truth. "
+        f"Do not invent anatomical locations, diagnoses, histology, severity, or other details that cannot be established from the images. "
         f"Output only the caption."
     )
     messages = [{"role": "user", "content": [
@@ -50,7 +53,7 @@ def generate_caption(image, overlay, labels, model, processor):
     inputs = processor(text=[text], images=[image, overlay], return_tensors="pt", padding=True).to(model.device)
 
     with torch.inference_mode():
-        output_ids = model.generate(**inputs, max_new_tokens=100, do_sample=False)
+        output_ids = model.generate(**inputs, max_new_tokens=128, do_sample=False)
 
     generated_ids = output_ids[:, inputs.input_ids.shape[1]:]
     return processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0].strip()
@@ -73,7 +76,8 @@ def main():
 
     completed = {row["image_id"] for row in rows if row.get("caption")}
 
-    for index, (image_id, info) in enumerate(annotations.items(), start=1):
+    #for image_id, info in tqdm(annotations.items(), total=len(annotations), desc="Generating captions"):
+    for image_id, info in tqdm(list(annotations.items())[:5], desc="Generating captions"):
         if image_id in completed:
             continue
 
@@ -82,7 +86,6 @@ def main():
         labels = sorted({box["label"] for box in info.get("bbox", []) if box.get("label")})
 
         if image_path is None or mask_path is None or not labels:
-            print(f"[{index}/{len(annotations)}] Skipped {image_id}: missing image, mask, or label")
             continue
 
         try:
@@ -92,7 +95,6 @@ def main():
             caption = generate_caption(image, overlay, labels, model, processor)
 
             if not caption:
-                print(f"[{index}/{len(annotations)}] Empty caption: {image_id}")
                 continue
 
             rows.append({
@@ -104,10 +106,9 @@ def main():
             })
 
             pd.DataFrame(rows).to_csv(OUTPUT_FILE, index=False)
-            print(f"[{index}/{len(annotations)}] {image_id}: {caption}")
 
         except Exception as e:
-            print(f"[{index}/{len(annotations)}] Error {image_id}: {e}")
+            tqdm.write(f"Error {image_id}: {e}")
 
     print(f"\nFinished. Saved {len(rows)} captions to {OUTPUT_FILE}")
 
