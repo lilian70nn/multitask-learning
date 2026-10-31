@@ -1,0 +1,6 @@
+torch
+transformers>=4.49.0,<5.0
+accelerate
+pillow
+pandas
+qwen-vl-utils
