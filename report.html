@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Experimental Report</title>
 
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: "base",
+            flowchart: {
+                htmlLabels: true,
+                nodeSpacing: 35,
+                rankSpacing: 50
+            }
+        });
+    </script>
+
     <style>
         * {
             box-sizing: border-box;
@@ -17,6 +31,21 @@
             font-family: -apple-system, BlinkMacSystemFont,
                          "Segoe UI", Arial, sans-serif;
             line-height: 1.7;
+        }
+
+        .mermaid {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: visible;
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .mermaid svg {
+            display: block;
+            width: 100%;
+            height: auto;
+            margin: 0 auto;
         }
 
         .container {
@@ -650,6 +679,132 @@
 
     <h2>3.1 Model Architecture</h2>
 
+
+    <h3>3.1.1 Overall Architecture (Baseline 3)</h3>
+
+    <p>
+        Figure 5 illustrates the complete architecture of Baseline 3.
+        Tensor shapes are shown for a single input image, with the batch
+        dimension omitted.
+    </p>
+
+    <div class="mermaid">
+    flowchart TB
+
+        IMG["Input Image<br/>[3, 224, 224]"]
+
+        subgraph MODELS["1. Frozen Feature Extractors"]
+            direction LR
+            CLS["EDL Classifier"]
+            VIT["ViT-B/16"]
+            SEG["EDL Segmenter"]
+        end
+
+        IMG --> CLS
+        IMG --> VIT
+        IMG --> SEG
+
+        subgraph CLASSIFICATION["2A. Classification Features"]
+            direction TB
+
+            CL["Logits<br/>[16]"]
+            CA["Dirichlet Parameters<br/>α = softplus(logits) + 1<br/>[16]"]
+
+            CP["Prediction<br/>α / Σα<br/>[16]"]
+            CE["Evidence Features<br/>log(α)<br/>[16]"]
+
+            CPA["Prediction Adapter<br/>Linear: 16 → 896<br/>[1, 896]"]
+            CEA["Evidence Adapter<br/>Linear: 16 → 896<br/>[1, 896]"]
+
+            CL --> CA
+            CA --> CP
+            CA --> CE
+            CP --> CPA
+            CE --> CEA
+        end
+
+        subgraph VISUAL["2B. Visual Features"]
+            direction TB
+
+            VF["ViT Features<br/>[197, 768]"]
+            VA["Visual Adapter<br/>Linear: 768 → 896<br/>[197, 896]"]
+
+            VF --> VA
+        end
+
+        subgraph SEGMENTATION["2C. Segmentation Features"]
+            direction TB
+
+            SL["Logits<br/>[2, 224, 224]"]
+            SA["Dirichlet Parameters<br/>α = softplus(logits) + 1<br/>[2, 224, 224]"]
+
+            SP["Prediction<br/>α / Σα<br/>[2, 224, 224]"]
+            SE["Evidence Features<br/>log(α)<br/>[2, 224, 224]"]
+
+            SPA["Prediction Adapter<br/>Pool: [2, 8, 8]<br/>Flatten: [64, 2]<br/>Linear: 2 → 896<br/>[64, 896]"]
+
+            SEA["Evidence Adapter<br/>Pool: [2, 8, 8]<br/>Flatten: [64, 2]<br/>Linear: 2 → 896<br/>[64, 896]"]
+
+            SL --> SA
+            SA --> SP
+            SA --> SE
+            SP --> SPA
+            SE --> SEA
+        end
+
+        CLS --> CL
+        VIT --> VF
+        SEG --> SL
+
+        CPA --> CONCAT
+        CEA --> CONCAT
+        VA --> CONCAT
+        SPA --> CONCAT
+        SEA --> CONCAT
+
+        CONCAT["3. Token Concatenation<br/>197 + 1 + 1 + 64 + 64 = 327<br/>[327, 896]"]
+
+        CONCAT --> DEC["4. Qwen2.5-0.5B Decoder<br/>Hidden Size: 896"]
+        DEC --> OUT["Generated Caption"]
+
+        classDef frozen fill:#f1f5f9,stroke:#64748b,color:#334155;
+        classDef prediction fill:#dbeafe,stroke:#2563eb,color:#1e40af;
+        classDef evidence fill:#ffedd5,stroke:#ea580c,color:#9a3412;
+        classDef output fill:#dcfce7,stroke:#16a34a,color:#166534;
+
+        class CLS,VIT,SEG frozen;
+        class CP,CPA,VA,SP,SPA prediction;
+        class CE,CEA,SE,SEA evidence;
+        class DEC,OUT output;
+
+        style MODELS fill:#f8fafc,stroke:#cbd5e1
+        style CLASSIFICATION fill:#f8fafc,stroke:#cbd5e1
+        style VISUAL fill:#f8fafc,stroke:#cbd5e1
+        style SEGMENTATION fill:#f8fafc,stroke:#cbd5e1
+    </div>
+
+    <p class="figure-caption">
+        Figure 5. Baseline 3 architecture with tensor dimensions.
+        Classification and segmentation outputs are separated into
+        probability and evidential branches. All five feature sequences
+        are projected into the 896-dimensional Qwen embedding space
+        before concatenation.
+    </p>
+
+    <p>
+        The prediction branches encode normalized Dirichlet
+        probabilities, whereas the evidence branches encode
+        log-transformed Dirichlet parameters.
+    </p>
+
+    <p>
+        Separate trainable adapters project all five feature sequences
+        into the 896-dimensional embedding space required by
+        Qwen2.5-0.5B. The resulting sequences are concatenated
+        along the token dimension to form a multimodal prefix
+        of shape [327, 896].
+    </p>
+
     <section class="card">
 
         <p>
@@ -675,13 +830,13 @@
 
                 <tr>
                     <td><strong>2</strong></td>
-                    <td>ViT + Classification + Segmentation</td>
+                    <td>ViT + CE classification probabilities + CE segmentation probabilities</td>
                     <td>262</td>
                 </tr>
 
                 <tr>
                     <td><strong>3</strong></td>
-                    <td>ViT + Classification + Segmentation + EDL evidence</td>
+                    <td>ViT + EDL classification probabilities and evidence + EDL segmentation probabilities and evidence</td>
                     <td>327</td>
                 </tr>
             </tbody>
@@ -714,9 +869,99 @@
         </p>
 
         <div class="note">
-            The captioning framework has been implemented,
-            and inference has been tested for Baselines 1, 2 and 3.
-            Captioning training has not yet been performed.
+            The captioning framework has been implemented for all
+            three baselines. The pretrained feature extractors are
+            frozen, while the multimodal adapters and Qwen decoder
+            are trained for image caption generation.
+        </div>
+
+    </section>
+
+    <!-- Captioning Experimental Settings -->
+    <h2>3.2 Experimental Settings</h2>
+
+    <section class="card">
+
+        <h3>3.2.1 Dataset</h3>
+
+        <p>
+            The image captioning experiments were conducted using
+            a subset of polyp images from the dataset employed
+            in the segmentation experiments.
+        </p>
+
+        <p>
+            A total of <strong>1,000 polyp images</strong> were selected
+            for the captioning task. Since manually annotated image
+            captions were not available, Qwen2.5-VL-3B-Instruct
+            was used to generate pseudo-captions for the selected
+            images. These generated descriptions served as reference
+            captions for model training and evaluation.
+        </p>
+
+        <p>
+            The dataset was randomly divided into training and
+            validation sets using an <strong>80:20 split</strong>
+            with a fixed random seed of <strong>42</strong>,
+            resulting in <strong>800 training images</strong>
+            and <strong>200 validation images</strong>.
+        </p>
+
+        <p>
+            The same dataset split and reference captions were
+            used across all three captioning baselines to ensure
+            a consistent comparison.
+        </p>
+
+    </section>
+
+    <h2>3.3 Experimental Results</h2>
+
+    <section class="card">
+
+        <h3>3.3.1 Captioning Performance</h3>
+
+        <p>
+            Table 4 presents the captioning performance of the
+            three baselines on the validation set.
+            Results are reported using the best validation loss,
+            BLEU, and BERTScore F1.
+        </p>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Baseline</th>
+                        <th>Best Val Loss ↓</th>
+                        <th>BLEU ↑</th>
+                        <th>BERTScore F1 ↑</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr>
+                        <td>Baseline 1</td>
+                        <td><strong>0.3774</strong></td>
+                        <td>48.6525</td>
+                        <td><strong>0.9460</strong></td>
+                    </tr>
+
+                    <tr>
+                        <td>Baseline 2</td>
+                        <td>0.3843</td>
+                        <td>48.1534</td>
+                        <td>0.9407</td>
+                    </tr>
+
+                    <tr>
+                        <td>Baseline 3</td>
+                        <td>0.3813</td>
+                        <td><strong>50.8138</strong></td>
+                        <td>0.9458</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
     </section>
