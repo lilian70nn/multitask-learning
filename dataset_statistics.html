@@ -1,0 +1,276 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataset Statistics</title>
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1050px;
+            margin: 24px auto;
+            padding: 0 20px;
+            color: #222;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        h1 {
+            font-size: 22px;
+            margin: 0 0 16px;
+        }
+
+        h2 {
+            font-size: 17px;
+            margin: 24px 0 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        h3 {
+            font-size: 14px;
+            margin: 14px 0 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 6px 0 12px;
+        }
+
+        th, td {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f4f7;
+            font-weight: 600;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        tfoot th {
+            background-color: #e9edf2;
+        }
+
+        p {
+            margin: 6px 0 12px;
+            font-size: 12px;
+            color: #555;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Dataset Statistics</h1>
+
+    <h2>1. Dataset Overview</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Dataset</th>
+                <th>Classification</th>
+                <th>Captioning</th>
+                <th>Segmentation</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Current Dataset</td>
+                <td>10,619 images / 23 classes</td>
+                <td>-</td>
+                <td>1,000 image-mask pairs</td>
+            </tr>
+            <tr>
+                <td>Kvasir-v2 + Gut-VLM</td>
+                <td>8,000 images / 8 classes</td>
+                <td>1,816 images</td>
+                <td>—</td>
+            </tr>
+            <tr>
+                <td>SAGE</td>
+                <td>1300 images / 14 classes</td>
+                <td>1,300 images</td>
+                <td>—</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>
+        <strong>Note:</strong>
+        SAGE contains 1,300 images in total, including
+        438 images without classification labels.
+    </p>
+
+
+
+    <h2>2. Current Dataset</h2>
+
+    <h3>Classification Statistics</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Class</th>
+                <th>Total Images</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>barretts</td><td>41</td></tr>
+            <tr><td>barretts-short-segment</td><td>53</td></tr>
+            <tr><td>bbps-0-1</td><td>646</td></tr>
+            <tr><td>bbps-2-3</td><td>1,148</td></tr>
+            <tr><td>cecum</td><td>1,009</td></tr>
+            <tr><td>dyed-lifted-polyps</td><td>1,002</td></tr>
+            <tr><td>dyed-resection-margins</td><td>989</td></tr>
+            <tr><td>esophagitis-a</td><td>388</td></tr>
+            <tr><td>esophagitis-b-d</td><td>232</td></tr>
+            <tr><td>hemorrhoids</td><td>6</td></tr>
+            <tr><td>ileum</td><td>9</td></tr>
+            <tr><td>impacted-stool</td><td>131</td></tr>
+            <tr><td>polyps</td><td>1,028</td></tr>
+            <tr><td>pylorus</td><td>999</td></tr>
+            <tr><td>retroflex-rectum</td><td>391</td></tr>
+            <tr><td>retroflex-stomach</td><td>764</td></tr>
+            <tr><td>ulcerative-colitis-grade-0-1</td><td>35</td></tr>
+            <tr><td>ulcerative-colitis-grade-1</td><td>201</td></tr>
+            <tr><td>ulcerative-colitis-grade-1-2</td><td>11</td></tr>
+            <tr><td>ulcerative-colitis-grade-2</td><td>443</td></tr>
+            <tr><td>ulcerative-colitis-grade-2-3</td><td>28</td></tr>
+            <tr><td>ulcerative-colitis-grade-3</td><td>133</td></tr>
+            <tr><td>z-line</td><td>932</td></tr>
+        </tbody>
+        <tfoot>
+            <tr>
+                <th>Total (23 classes)</th>
+                <th>10,619</th>
+            </tr>
+        </tfoot>
+    </table>
+
+    <h3>Segmentation Statistics</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Class</th>
+                <th>Images</th>
+                <th>Masks</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>polyps</td>
+                <td>1,000</td>
+                <td>1,000</td>
+            </tr>
+        </tbody>
+    </table>
+
+
+
+
+    <h2>3. Kvasir-v2 + Gut-VLM</h2>
+
+    <h3>Classification &amp; Caption Statistics</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Class</th>
+                <th>Total Images</th>
+                <th>With Captions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>dyed-lifted-polyps</td><td>1,000</td><td>172</td></tr>
+            <tr><td>dyed-resection-margins</td><td>1,000</td><td>172</td></tr>
+            <tr><td>esophagitis</td><td>1,000</td><td>172</td></tr>
+            <tr><td>normal-cecum</td><td>1,000</td><td>320</td></tr>
+            <tr><td>normal-pylorus</td><td>1,000</td><td>320</td></tr>
+            <tr><td>normal-z-line</td><td>1,000</td><td>316</td></tr>
+            <tr><td>polyps</td><td>1,000</td><td>172</td></tr>
+            <tr><td>ulcerative-colitis</td><td>1,000</td><td>172</td></tr>
+        </tbody>
+        <tfoot>
+            <tr>
+                <th>Total (8 classes)</th>
+                <th>8,000</th>
+                <th>1,816</th>
+            </tr>
+        </tfoot>
+    </table>
+
+
+
+
+    <h2>4. SAGE</h2>
+
+    <h3>Classification &amp; Caption Statistics</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Class</th>
+                <th>Total Images</th>
+                <th>With Captions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>colon-normal</td><td>76</td><td>76</td></tr>
+            <tr><td>diverticulum</td><td>22</td><td>22</td></tr>
+            <tr><td>duodenum</td><td>47</td><td>47</td></tr>
+            <tr><td>esophagitis</td><td>40</td><td>40</td></tr>
+            <tr><td>foreign-body</td><td>38</td><td>38</td></tr>
+            <tr><td>fundus-retroflexion</td><td>48</td><td>48</td></tr>
+            <tr><td>growth</td><td>14</td><td>14</td></tr>
+            <tr><td>inflammation</td><td>75</td><td>75</td></tr>
+            <tr><td>instrument</td><td>103</td><td>103</td></tr>
+            <tr><td>polyp</td><td>124</td><td>124</td></tr>
+            <tr><td>pylorus-normal</td><td>181</td><td>181</td></tr>
+            <tr><td>rectum-retroflexion</td><td>29</td><td>29</td></tr>
+            <tr><td>ulcer</td><td>15</td><td>15</td></tr>
+            <tr><td>z-line-normal</td><td>50</td><td>50</td></tr>
+        </tbody>
+        <tfoot>
+            <tr>
+                <th>Labeled Images (14 classes)</th>
+                <th>862</th>
+                <th>862</th>
+            </tr>
+            <tr>
+                <th>Unlabeled Images</th>
+                <th>438</th>
+                <th>438</th>
+            </tr>
+            <tr>
+                <th>Total</th>
+                <th>1,300</th>
+                <th>1,300</th>
+            </tr>
+        </tfoot>
+    </table>
+
+    <p>
+        <strong>Note:</strong>
+        All 1,300 images have captions.
+        438 images do not have classification labels.
+    </p>
+
+    <p>
+        <strong>Note:</strong>
+        SAGE provides two classification annotation formats:
+        multi-class (14 classes) and multi-label (18 labels).
+        The statistics above use the multi-class annotations.
+    </p>
+
+</body>
+</html>
