@@ -198,12 +198,12 @@ if __name__ == "__main__":
     torch.manual_seed(42)
 
     train_loader, val_loader = initialize_segmentation_dataloaders(
-        data_dir="/content/segmented-images",
+        data_dir="/content/colonbench_segmentation",
         batch_size=256,
     )
     model = initialize_vit_unet(num_classes=2, ckpt_path=args.ckpt)
 
-    save_dir = args.save_dir or "/content/drive/MyDrive/results/segmentation"
+    save_dir = args.save_dir or "/content/drive/MyDrive/results/segmentation_new"
 
     train_segmentation(
         model=model,
