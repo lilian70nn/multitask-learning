@@ -79,10 +79,17 @@ def prepare_colonbench():
                         mask = np.asarray(m.convert("L")).copy()
 
                     if frame.shape[:2] != mask.shape:
-                        raise ValueError(
-                            f"Image/mask size mismatch: {video_id}, frame {frame_index}, "
-                            f"image={frame.shape[:2]}, mask={mask.shape}"
-                        )
+                        if abs(frame.shape[0] - mask.shape[0]) <= 1 and abs(frame.shape[1] - mask.shape[1]) <= 1:
+                            mask = cv2.resize(
+                                mask,
+                                (frame.shape[1], frame.shape[0]),
+                                interpolation=cv2.INTER_NEAREST
+                            )
+                        else:
+                            raise ValueError(
+                                f"Image/mask size mismatch: {video_id}, frame {frame_index}, "
+                                f"image={frame.shape[:2]}, mask={mask.shape}"
+                            )
 
                     if not np.isin(np.unique(mask), [0, 255]).all():
                         raise ValueError(f"Unexpected mask pixel values: {source_mask}")
