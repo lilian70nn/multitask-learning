@@ -1,9 +1,10 @@
-
 from pathlib import Path
 import csv
 import os
 import cv2
 import numpy as np
+import shutil
+import tempfile
 from PIL import Image
 from tqdm.auto import tqdm
 
@@ -14,10 +15,6 @@ COMPLETE_FLAG = OUTPUT_DIR / ".complete"
 
 
 def prepare_colonbench():
-    if COMPLETE_FLAG.is_file() and MANIFEST_PATH.is_file():
-        print("[ColonBench] Prepared data already exists.")
-        return OUTPUT_DIR
-
     video_dir = RAW_DIR / "videos"
     source_mask_dir = RAW_DIR / "masks"
 
@@ -30,6 +27,7 @@ def prepare_colonbench():
     (OUTPUT_DIR / "images").mkdir(parents=True, exist_ok=True)
     (OUTPUT_DIR / "masks").mkdir(parents=True, exist_ok=True)
 
+    COMPLETE_FLAG.unlink(missing_ok=True)
     records = []
 
     for video_number, video_path in enumerate(tqdm(videos, desc="Processing Videos", unit="video"), 1):
@@ -41,57 +39,89 @@ def prepare_colonbench():
             continue
 
         print(f"[ColonBench] Video {video_number}/{len(videos)}: {video_id} ({len(source_masks)} masks)")
+
         image_dir = OUTPUT_DIR / "images" / video_stem
         mask_dir = OUTPUT_DIR / "masks" / video_stem
         image_dir.mkdir(parents=True, exist_ok=True)
         mask_dir.mkdir(parents=True, exist_ok=True)
 
-        cap = cv2.VideoCapture(str(video_path))
-        if not cap.isOpened(): raise RuntimeError(f"Cannot open video: {video_path}")
+        with tempfile.TemporaryDirectory(prefix="colonbench_", dir="/content") as temp:
+            temp_dir = Path(temp)
+            local_video = temp_dir / video_id
+            local_images = temp_dir / "images"
+            local_masks = temp_dir / "masks"
+            local_images.mkdir()
+            local_masks.mkdir()
 
-        try:
-            for source_mask in tqdm(source_masks, desc=f"Frames {video_stem[:8]}", unit="frame", leave=False):
-                if source_mask.stat().st_size == 0:
-                    print(f"[ColonBench] Skipping empty mask: {source_mask}")
-                    continue
-                frame_index = int(source_mask.stem)
-                image_path = image_dir / f"{frame_index:06d}.jpg"
-                mask_path = mask_dir / f"{frame_index:06d}.png"
+            shutil.copy2(video_path, local_video)
 
-                if not image_path.is_file() or not mask_path.is_file():
+            cap = cv2.VideoCapture(str(local_video))
+            if not cap.isOpened(): raise RuntimeError(f"Cannot open video: {local_video}")
+
+            video_records = []
+
+            try:
+                for source_mask in tqdm(source_masks, desc=f"Frames {video_stem[:8]}", unit="frame", leave=False):
+                    if source_mask.stat().st_size == 0:
+                        print(f"[ColonBench] Skipping empty mask: {source_mask}")
+                        continue
+
+                    frame_index = int(source_mask.stem)
+                    image_name = f"{frame_index:06d}.jpg"
+                    mask_name = f"{frame_index:06d}.png"
+
                     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
                     success, frame = cap.read()
-                    if not success: raise RuntimeError(f"Cannot read frame {frame_index} from {video_id}")
+                    if not success:
+                        raise RuntimeError(f"Cannot read frame {frame_index} from {video_id}")
 
                     with Image.open(source_mask) as m:
                         mask = np.asarray(m.convert("L")).copy()
 
                     if frame.shape[:2] != mask.shape:
-                        raise ValueError(f"Image/mask size mismatch: {video_id}, frame {frame_index}, image={frame.shape[:2]}, mask={mask.shape}")
+                        raise ValueError(
+                            f"Image/mask size mismatch: {video_id}, frame {frame_index}, "
+                            f"image={frame.shape[:2]}, mask={mask.shape}"
+                        )
 
                     if not np.isin(np.unique(mask), [0, 255]).all():
                         raise ValueError(f"Unexpected mask pixel values: {source_mask}")
 
-                    if not cv2.imwrite(str(image_path), frame, [cv2.IMWRITE_JPEG_QUALITY, 95]):
-                        raise RuntimeError(f"Cannot save image: {image_path}")
+                    if not cv2.imwrite(str(local_images / image_name), frame, [cv2.IMWRITE_JPEG_QUALITY, 95]):
+                        raise RuntimeError(f"Cannot save image: {local_images / image_name}")
 
-                    Image.fromarray(mask).save(mask_path)
+                    shutil.copy2(source_mask, local_masks / mask_name)
 
-                records.append({
-                    "video_id": video_id,
-                    "frame_index": frame_index,
-                    "description": "",
-                    "image_path": str(image_path),
-                    "mask_path": str(mask_path)
-                })
-        finally:
-            cap.release()
+                    video_records.append({
+                        "video_id": video_id,
+                        "frame_index": frame_index,
+                        "description": "",
+                        "image_path": str(image_dir / image_name),
+                        "mask_path": str(mask_dir / mask_name)
+                    })
 
-    if not records: raise RuntimeError("No image-mask pairs were prepared.")
+            finally:
+                cap.release()
+
+            for record in tqdm(video_records, desc=f"Saving {video_stem[:8]}", unit="frame", leave=False):
+                image_path = Path(record["image_path"])
+                mask_path = Path(record["mask_path"])
+
+                shutil.copy2(local_images / image_path.name, image_path)
+                shutil.copy2(local_masks / mask_path.name, mask_path)
+
+            records.extend(video_records)
+
+    if not records:
+        raise RuntimeError("No image-mask pairs were prepared.")
 
     temp_manifest = MANIFEST_PATH.with_suffix(".csv.tmp")
+
     with open(temp_manifest, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["video_id", "frame_index", "description", "image_path", "mask_path"])
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["video_id", "frame_index", "description", "image_path", "mask_path"]
+        )
         writer.writeheader()
         writer.writerows(records)
 
