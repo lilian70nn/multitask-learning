@@ -11,7 +11,6 @@ from torchvision import transforms
 from torchvision.transforms import functional as TF
 from torchvision.transforms import InterpolationMode
 
-from segmentation_vit.prepare_colonbench import prepare_colonbench
 
 
 class SegmentationDataset(Dataset):
@@ -66,7 +65,7 @@ class SegmentationDataset(Dataset):
 
 
 def initialize_segmentation_dataloaders(
-    data_dir="/content/colonbench_segmentation",
+    data_dir="/content/drive/MyDrive/colonbench_segmentation",
     batch_size=16,
     image_size=224,
     num_workers=2,
@@ -78,13 +77,7 @@ def initialize_segmentation_dataloaders(
     complete_flag = data_dir / ".complete"
 
     if not manifest_path.is_file() or not complete_flag.is_file():
-        print("[Segmentation] Prepared ColonBench data not found. Starting preparation...")
-        prepared_dir = Path(prepare_colonbench())
-        if prepared_dir.resolve() != data_dir.resolve():
-            raise ValueError(f"Prepared data directory mismatch: {prepared_dir} != {data_dir}")
-
-    if not manifest_path.is_file() or not complete_flag.is_file():
-        raise RuntimeError("ColonBench preparation did not finish successfully.")
+        raise RuntimeError(f"ColonBench preparation is missing or incomplete: {data_dir}")
 
     with open(manifest_path, newline="") as f:
         records = list(csv.DictReader(f))
