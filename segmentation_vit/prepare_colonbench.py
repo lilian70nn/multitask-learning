@@ -5,9 +5,10 @@ import os
 import cv2
 import numpy as np
 from PIL import Image
+from tqdm.auto import tqdm
 
 RAW_DIR = Path("/content/drive/MyDrive/colonbench_raw")
-OUTPUT_DIR = Path("/content/drive/MyDrive/datasets/colonbench_segmentation")
+OUTPUT_DIR = Path("/content/drive/MyDrive/colonbench_segmentation")
 MANIFEST_PATH = OUTPUT_DIR / "manifest.csv"
 COMPLETE_FLAG = OUTPUT_DIR / ".complete"
 
@@ -31,13 +32,13 @@ def prepare_colonbench():
 
     records = []
 
-    for video_number, video_path in enumerate(videos, 1):
+    for video_number, video_path in enumerate(tqdm(videos, desc="Processing Videos", unit="video"), 1):
         video_id = video_path.name
         video_stem = video_path.stem
         source_masks = sorted((source_mask_dir / video_stem).glob("*.png"))
 
         if not source_masks:
-            raise FileNotFoundError(f"No masks found for video: {video_id}")
+            continue
 
         print(f"[ColonBench] Video {video_number}/{len(videos)}: {video_id} ({len(source_masks)} masks)")
         image_dir = OUTPUT_DIR / "images" / video_stem
@@ -49,7 +50,7 @@ def prepare_colonbench():
         if not cap.isOpened(): raise RuntimeError(f"Cannot open video: {video_path}")
 
         try:
-            for source_mask in source_masks:
+            for source_mask in tqdm(source_masks, desc=f"Frames {video_stem[:8]}", unit="frame", leave=False):
                 if source_mask.stat().st_size == 0:
                     print(f"[ColonBench] Skipping empty mask: {source_mask}")
                     continue
