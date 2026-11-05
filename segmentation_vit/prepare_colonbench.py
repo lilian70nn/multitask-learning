@@ -50,6 +50,9 @@ def prepare_colonbench():
 
         try:
             for source_mask in source_masks:
+                if source_mask.stat().st_size == 0:
+                    print(f"[ColonBench] Skipping empty mask: {source_mask}")
+                    continue
                 frame_index = int(source_mask.stem)
                 image_path = image_dir / f"{frame_index:06d}.jpg"
                 mask_path = mask_dir / f"{frame_index:06d}.png"
