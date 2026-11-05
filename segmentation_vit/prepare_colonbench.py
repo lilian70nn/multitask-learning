@@ -6,12 +6,14 @@ import numpy as np
 import shutil
 import tempfile
 from PIL import Image
+from collections import Counter
 from tqdm.auto import tqdm
 
 RAW_DIR = Path("/content/drive/MyDrive/colonbench_raw")
 OUTPUT_DIR = Path("/content/drive/MyDrive/colonbench_segmentation")
 MANIFEST_PATH = OUTPUT_DIR / "manifest.csv"
 COMPLETE_FLAG = OUTPUT_DIR / ".complete"
+SKIPPED_PATH = OUTPUT_DIR / "skipped_frames.csv"
 
 
 def prepare_colonbench():
@@ -29,6 +31,18 @@ def prepare_colonbench():
 
     COMPLETE_FLAG.unlink(missing_ok=True)
     records = []
+    skipped = []
+    skipped_counts = Counter()
+
+    def record_skip(video_id, frame_index, reason, detail):
+        skipped.append({
+            "video_id": video_id,
+            "frame_index": frame_index,
+            "reason": reason,
+            "detail": detail
+        })
+        skipped_counts[reason] += 1
+        print(f"[ColonBench] Skipping: {video_id}, frame {frame_index}, {reason}: {detail}")
 
     for video_number, video_path in enumerate(tqdm(videos, desc="Processing Videos", unit="video"), 1):
         video_id = video_path.name
@@ -62,37 +76,42 @@ def prepare_colonbench():
 
             try:
                 for source_mask in tqdm(source_masks, desc=f"Frames {video_stem[:8]}", unit="frame", leave=False):
+                    frame_index = int(source_mask.stem)
                     if source_mask.stat().st_size == 0:
-                        print(f"[ColonBench] Skipping empty mask: {source_mask}")
+                        record_skip(video_id, frame_index, "empty_mask", str(source_mask))
                         continue
 
-                    frame_index = int(source_mask.stem)
                     image_name = f"{frame_index:06d}.jpg"
                     mask_name = f"{frame_index:06d}.png"
 
                     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
                     success, frame = cap.read()
                     if not success:
-                        raise RuntimeError(f"Cannot read frame {frame_index} from {video_id}")
+                        record_skip(
+                            video_id, frame_index,
+                            "frame_read_failed",
+                            "Cannot read video frame"
+                        )
+                        continue
 
                     with Image.open(source_mask) as m:
                         mask = np.asarray(m.convert("L")).copy()
 
                     if frame.shape[:2] != mask.shape:
-                        if abs(frame.shape[0] - mask.shape[0]) <= 1 and abs(frame.shape[1] - mask.shape[1]) <= 1:
-                            mask = cv2.resize(
-                                mask,
-                                (frame.shape[1], frame.shape[0]),
-                                interpolation=cv2.INTER_NEAREST
-                            )
-                        else:
-                            raise ValueError(
-                                f"Image/mask size mismatch: {video_id}, frame {frame_index}, "
-                                f"image={frame.shape[:2]}, mask={mask.shape}"
-                            )
+                        record_skip(
+                            video_id, frame_index,
+                            "size_mismatch",
+                            f"image={frame.shape[:2]}, mask={mask.shape}"
+                        )
+                        continue
 
                     if not np.isin(np.unique(mask), [0, 255]).all():
-                        raise ValueError(f"Unexpected mask pixel values: {source_mask}")
+                        record_skip(
+                            video_id, frame_index,
+                            "invalid_mask_values",
+                            str(source_mask)
+                        )
+                        continue
 
                     if not cv2.imwrite(str(local_images / image_name), frame, [cv2.IMWRITE_JPEG_QUALITY, 95]):
                         raise RuntimeError(f"Cannot save image: {local_images / image_name}")
@@ -133,7 +152,24 @@ def prepare_colonbench():
         writer.writerows(records)
 
     os.replace(temp_manifest, MANIFEST_PATH)
+
+    with open(SKIPPED_PATH, "w", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["video_id", "frame_index", "reason", "detail"]
+        )
+        writer.writeheader()
+        writer.writerows(skipped)
+
+
     COMPLETE_FLAG.write_text(str(len(records)))
 
     print(f"[ColonBench] Preparation completed: {len(records)} image-mask pairs.")
+    print(f"[ColonBench] Skipped frames: {len(skipped)}")
+
+    for reason, count in sorted(skipped_counts.items()):
+        print(f"  {reason}: {count}")
+
+    print(f"[ColonBench] Skipped report: {SKIPPED_PATH}")
+
     return OUTPUT_DIR
