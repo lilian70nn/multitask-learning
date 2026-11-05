@@ -98,12 +98,18 @@ def prepare_colonbench():
                         mask = np.asarray(m.convert("L")).copy()
 
                     if frame.shape[:2] != mask.shape:
-                        record_skip(
-                            video_id, frame_index,
-                            "size_mismatch",
-                            f"image={frame.shape[:2]}, mask={mask.shape}"
-                        )
-                        continue
+                        if (
+                            mask.shape[0] == frame.shape[0] + 1
+                            and mask.shape[1] == frame.shape[1]
+                            and np.all(mask[-1] == 0)
+                        ):
+                            mask = mask[:-1, :].copy()
+                        else:
+                            record_skip(
+                                video_id, frame_index, "size_mismatch",
+                                f"image={frame.shape[:2]}, mask={mask.shape}"
+                            )
+                            continue
 
                     if not np.isin(np.unique(mask), [0, 255]).all():
                         record_skip(
@@ -116,7 +122,7 @@ def prepare_colonbench():
                     if not cv2.imwrite(str(local_images / image_name), frame, [cv2.IMWRITE_JPEG_QUALITY, 95]):
                         raise RuntimeError(f"Cannot save image: {local_images / image_name}")
 
-                    shutil.copy2(source_mask, local_masks / mask_name)
+                    Image.fromarray(mask).save(local_masks / mask_name)
 
                     video_records.append({
                         "video_id": video_id,
