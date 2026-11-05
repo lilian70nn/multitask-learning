@@ -19,8 +19,7 @@ from caption.captioner_vit import load_captioning_model
 
 # ==================== CONFIG ====================
 DATA_DIR = Path("/content/segmented-images")
-CSV_FILE = DATA_DIR / "pseudo_captions.csv"
-IMAGE_DIR = DATA_DIR / "images"
+JSON_FILE = DATA_DIR / "all_annotations.json"
 
 IMAGE_SIZE = 224
 TRAIN_RATIO = 0.8
@@ -28,9 +27,12 @@ SEED = 42
 
 
 class CaptionDataset(Dataset):
-    def __init__(self, csv_file, image_dir):
-        self.df = pd.read_csv(csv_file).dropna(subset=["image_id", "caption"]).reset_index(drop=True)
-        self.image_dir = Path(image_dir)
+    def __init__(self, data_dir):
+        self.data_dir = Path(data_dir)
+
+        with open(self.data_dir / "all_annotations.json", "r", encoding="utf-8") as f:
+            annotations = json.load(f)
+
         self.transform = transforms.Compose([
             transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
             transforms.ToTensor(),
@@ -40,22 +42,23 @@ class CaptionDataset(Dataset):
             )
         ])
 
+        image_files = {
+            p.name: p
+            for p in self.data_dir.rglob("*")
+            if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png"}
+        }
+
         self.samples = []
-        for _, row in self.df.iterrows():
-            image_id = str(row["image_id"])
-            image_path = self.find_image(image_id)
-            if image_path is not None:
-                self.samples.append((image_path, str(row["caption"]), image_id))
+        for image_name, entry in annotations.items():
+            image_path = image_files.get(image_name)
+            if image_path is None:
+                raise FileNotFoundError(f"Image not found: {image_name}")
+            caption = entry["corrections"]
+            if not isinstance(caption, str) or not caption.strip():
+                raise ValueError(f"Invalid caption: {image_name}")
+            self.samples.append((image_path, caption, image_name))
 
-        if not self.samples:
-            raise ValueError(f"No valid images found in {self.image_dir}")
-
-    def find_image(self, image_id):
-        for ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"]:
-            path = self.image_dir / f"{image_id}{ext}"
-            if path.exists():
-                return path
-        return None
+        print(f"Loaded {len(self.samples)} caption samples")
 
     def __len__(self):
         return len(self.samples)
@@ -197,7 +200,7 @@ def main():
     output_dir = Path(args.output_dir) / f"baseline_{args.baseline}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset = CaptionDataset(CSV_FILE, IMAGE_DIR)
+    dataset = CaptionDataset(DATA_DIR)
     train_set, val_set = split_dataset(dataset)
 
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=2, pin_memory=True)
