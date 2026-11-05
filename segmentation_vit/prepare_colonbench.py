@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-RAW_DIR = Path("/content/colonbench_raw")
+RAW_DIR = Path("/content/drive/MyDrive/colonbench_raw")
 OUTPUT_DIR = Path("/content/drive/MyDrive/datasets/colonbench_segmentation")
 MANIFEST_PATH = OUTPUT_DIR / "manifest.csv"
 COMPLETE_FLAG = OUTPUT_DIR / ".complete"
