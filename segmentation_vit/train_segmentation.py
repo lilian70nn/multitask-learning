@@ -198,8 +198,8 @@ if __name__ == "__main__":
     torch.manual_seed(42)
 
     train_loader, val_loader = initialize_segmentation_dataloaders(
-        #data_dir=str(Path.home() / "mtl_data" / "colonbench_segmentation"),
-        data_dir="/content/colonbench_segmentation_test",
+        data_dir=str(Path.home() / "mtl_data" / "colonbench_segmentation"),
+        #data_dir="/content/colonbench_segmentation_test",
         batch_size=256,
     )
     model = initialize_vit_unet(num_classes=2, ckpt_path=args.ckpt)

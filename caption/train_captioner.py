@@ -18,8 +18,8 @@ from caption.captioner_vit import load_captioning_model
 
 
 # ==================== CONFIG ====================
-#DATA_DIR = Path.home() / "mtl_data" / "kvasir-dataset-v2"
-DATA_DIR = Path("/content/drive/MyDrive/kvasir-dataset-v2")
+DATA_DIR = Path.home() / "mtl_data" / "kvasir-dataset-v2"
+#DATA_DIR = Path("/content/drive/MyDrive/kvasir-dataset-v2")
 JSON_FILE = DATA_DIR / "all_annotations.json"
 
 IMAGE_SIZE = 224

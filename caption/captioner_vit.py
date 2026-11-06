@@ -122,7 +122,30 @@ class CaptioningModel(nn.Module):
                 model.eval()
         return self
 
-    def extract_features(self, images):
+    # def extract_features(self, images, cls_gt=None, seg_gt=None):
+    #     with torch.no_grad():
+    #         z = self.vision_encoder.forward_features(images)
+    #         cls_probs, seg_probs, cls_alpha, seg_alpha = None, None, None, None
+
+    #         if self.cls_model is not None:
+
+    #             cls_logits = self.cls_model(images)
+    #             seg_logits = self.seg_model(images)          
+
+    #             if self.use_evidence:
+    #                 cls_alpha = F.softplus(cls_logits) + 1.0
+    #                 seg_alpha = F.softplus(seg_logits) + 1.0
+    #                 cls_probs = cls_alpha / cls_alpha.sum(dim=-1, keepdim=True)
+    #                 seg_probs = seg_alpha / seg_alpha.sum(dim=1, keepdim=True)
+    #             else:
+    #                 cls_alpha, seg_alpha = None, None
+    #                 cls_probs = F.softmax(cls_logits, dim=-1)
+    #                 seg_probs = F.softmax(seg_logits, dim=1)
+
+    #     return self.adapter(z=z, cls_probs=cls_probs, seg_probs=seg_probs, cls_alpha=cls_alpha, seg_alpha=seg_alpha)
+
+
+    def extract_features(self, images, cls_gt=None, seg_gt=None):
         with torch.no_grad():
             z = self.vision_encoder.forward_features(images)
             cls_probs, seg_probs, cls_alpha, seg_alpha = None, None, None, None
@@ -131,19 +154,35 @@ class CaptioningModel(nn.Module):
 
                 cls_logits = self.cls_model(images)
                 seg_logits = self.seg_model(images)
-
                 if self.use_evidence:
                     cls_alpha = F.softplus(cls_logits) + 1.0
                     seg_alpha = F.softplus(seg_logits) + 1.0
                     cls_probs = cls_alpha / cls_alpha.sum(dim=-1, keepdim=True)
                     seg_probs = seg_alpha / seg_alpha.sum(dim=1, keepdim=True)
+
                 else:
                     cls_alpha, seg_alpha = None, None
                     cls_probs = F.softmax(cls_logits, dim=-1)
                     seg_probs = F.softmax(seg_logits, dim=1)
 
+                if cls_gt is not None:
+                    cls_probs = F.one_hot(cls_gt.to(images.device).long(), num_classes=cls_logits.shape[1]).to(cls_logits.dtype)
+                    if self.use_evidence:
+                        cls_alpha = 1.0 + 100.0 * cls_probs
+
+                if seg_gt is not None:
+                    mask = seg_gt.to(images.device).long()
+
+                    if mask.ndim == 4 and mask.shape[1] == 1:
+                        mask = mask.squeeze(1)
+                    seg_probs = F.one_hot(mask, num_classes=seg_logits.shape[1]).permute(0, 3, 1, 2).to(seg_logits.dtype)
+                    if self.use_evidence:
+                        seg_alpha = 1.0 + 100.0 * seg_probs
+
         return self.adapter(z=z, cls_probs=cls_probs, seg_probs=seg_probs, cls_alpha=cls_alpha, seg_alpha=seg_alpha)
 
+
+    
     def forward(self, images, captions):
         prefix = self.extract_features(images)
         batch_size = images.shape[0]
@@ -195,10 +234,10 @@ class CaptioningModel(nn.Module):
         )
 
     @torch.no_grad()
-    def generate(self, images, max_new_tokens=64):
+    def generate(self, images, max_new_tokens=64, cls_gt=None, seg_gt=None):
         self.eval()
 
-        prefix = self.extract_features(images)
+        prefix = self.extract_features(images, cls_gt=cls_gt, seg_gt=seg_gt)
         batch_size = images.shape[0]
 
         start_ids = torch.full(
