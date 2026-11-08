@@ -190,6 +190,7 @@ def train_segmentation(model, train_loader, val_loader, epochs, edl=False, save_
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--edl", action="store_true", help="Enable evidential deep learning",)
+    parser.add_argument("--batch_size", "--bs", type=int, default=256, help="Training and validation batch size")
     parser.add_argument("--epochs", type=int, default=30, help="Number of training epochs")
     parser.add_argument("--ckpt", type=str, default=None, help="Path to DINO or LeJEPA pretrained checkpoint",)
     parser.add_argument("--save_dir", type=str, default=None, help="Directory to save training results",)
@@ -200,7 +201,7 @@ if __name__ == "__main__":
     train_loader, val_loader = initialize_segmentation_dataloaders(
         data_dir=str(Path.home() / "mtl_data" / "colonbench_segmentation"),
         #data_dir="/content/colonbench_segmentation_test",
-        batch_size=256,
+        batch_size=args.batch_size,
     )
     model = initialize_vit_unet(num_classes=2, ckpt_path=args.ckpt)
 
