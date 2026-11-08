@@ -6,7 +6,8 @@ import numpy as np
 import torch
 from PIL import Image
 from sklearn.model_selection import GroupShuffleSplit
-from torch.utils.data import Dataset, DataLoader
+from collections import Counter
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from torchvision import transforms
 from torchvision.transforms import functional as TF
 from torchvision.transforms import InterpolationMode
@@ -108,10 +109,26 @@ def initialize_segmentation_dataloaders(
 
     assert train_videos.isdisjoint(val_videos), "Video leakage detected between training and validation."
 
+    # Count the number of frames in each training video
+    train_video_ids = [groups[i] for i in train_indices]
+    video_counts = Counter(train_video_ids)
+
+    # Each video receives approximately equal sampling probability
+    sample_weights = torch.DoubleTensor([
+        1.0 / video_counts[video_id]
+        for video_id in train_video_ids
+    ])
+
+    train_sampler = WeightedRandomSampler(
+        weights=sample_weights,
+        num_samples=len(train_samples),
+        replacement=True,
+    )
+
     train_loader = DataLoader(
         SegmentationDataset(train_samples, image_size=image_size, train=True),
         batch_size=batch_size,
-        shuffle=True,
+        sampler=train_sampler,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
     )
