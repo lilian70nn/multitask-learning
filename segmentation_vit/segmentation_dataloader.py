@@ -66,7 +66,7 @@ class SegmentationDataset(Dataset):
 
 
 def initialize_segmentation_dataloaders(
-    data_dir="/content/drive/MyDrive/colonbench_segmentation",
+    data_dir=Path.home() / "mtl_data" / "colonbench_segmentation",
     batch_size=16,
     image_size=224,
     num_workers=2,

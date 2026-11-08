@@ -1,3 +1,4 @@
+
 from pathlib import Path
 import random
 
@@ -57,58 +58,72 @@ class SegmentationDataset(Dataset):
 
         image = TF.to_tensor(image)
         image = self.normalize(image)
-        mask = torch.from_numpy((np.array(mask) > 127).astype(np.int64))
+
+        mask = torch.from_numpy(
+            (np.array(mask) > 127).astype(np.int64)
+        )
 
         return image, mask
 
 
 def initialize_segmentation_dataloaders(
-    data_dir="./data/segmented-images",
+    data_dir=None,
     batch_size=16,
     image_size=224,
     num_workers=2,
     seed=42,
 ):
+    if data_dir is None:
+        data_dir = Path.home() / "mtl_data" / "segmented_polyp"
+
     data_dir = Path(data_dir)
+    images_dir = data_dir / "images"
+    masks_dir = data_dir / "masks"
 
-    image_dir = data_dir / "images"
-    mask_dir = data_dir / "masks"
+    if not images_dir.is_dir():
+        raise FileNotFoundError(f"Images directory not found: {images_dir}")
 
-    if not image_dir.is_dir():
-        raise FileNotFoundError(f"Image directory not found: {image_dir}")
+    if not masks_dir.is_dir():
+        raise FileNotFoundError(f"Masks directory not found: {masks_dir}")
 
-    if not mask_dir.is_dir():
-        raise FileNotFoundError(f"Mask directory not found: {mask_dir}")
+    valid_extensions = {".jpg", ".jpeg", ".png"}
 
-    image_extensions = {".jpg", ".jpeg", ".png"}
-    image_paths = sorted(
-        p for p in image_dir.rglob("*")
-        if p.is_file() and p.suffix.lower() in image_extensions
-    )
-
-    mask_paths = {
-        p.stem: p
-        for p in mask_dir.rglob("*")
-        if p.is_file() and p.suffix.lower() in image_extensions
+    image_files = {
+        p.name: p
+        for p in images_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in valid_extensions
     }
 
-    samples = []
-    missing_masks = []
+    mask_files = {
+        p.name: p
+        for p in masks_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in valid_extensions
+    }
 
-    for image_path in image_paths:
-        mask_path = mask_paths.get(image_path.stem)
-
-        if mask_path is None:
-            missing_masks.append(image_path.name)
-            continue
-
-        samples.append((image_path, mask_path))
+    missing_masks = set(image_files) - set(mask_files)
+    missing_images = set(mask_files) - set(image_files)
 
     if missing_masks:
-        print(f"[Segmentation] Images without masks: {len(missing_masks)}")
+        raise FileNotFoundError(
+            f"Missing masks for {len(missing_masks)} images: "
+            f"{sorted(missing_masks)[:10]}"
+        )
+
+    if missing_images:
+        raise FileNotFoundError(
+            f"Missing images for {len(missing_images)} masks: "
+            f"{sorted(missing_images)[:10]}"
+        )
+
+    samples = [
+        (image_files[name], mask_files[name])
+        for name in sorted(image_files)
+    ]
 
     if len(samples) < 2:
-        raise ValueError(f"Not enough image-mask pairs found in {data_dir}")
+        raise ValueError(
+            f"Not enough image-mask pairs in {data_dir}"
+        )
 
     train_samples, val_samples = train_test_split(
         samples,
@@ -141,8 +156,8 @@ def initialize_segmentation_dataloaders(
         pin_memory=torch.cuda.is_available(),
     )
 
-    print(f"[Segmentation] Total image-mask pairs: {len(samples)}")
-    print(f"[Segmentation] Training images: {len(train_samples)}")
-    print(f"[Segmentation] Validation images: {len(val_samples)}")
+    print(f"[HyperKvasir Segmentation] Total pairs: {len(samples)}")
+    print(f"[HyperKvasir Segmentation] Training images: {len(train_samples)}")
+    print(f"[HyperKvasir Segmentation] Validation images: {len(val_samples)}")
 
     return train_loader, val_loader

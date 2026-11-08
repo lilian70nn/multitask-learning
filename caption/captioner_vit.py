@@ -166,7 +166,11 @@ class CaptioningModel(nn.Module):
                     seg_probs = F.softmax(seg_logits, dim=1)
 
                 if cls_gt is not None:
-                    cls_probs = F.one_hot(cls_gt.to(images.device).long(), num_classes=cls_logits.shape[1]).to(cls_logits.dtype)
+                    cls_probs = cls_gt.to(
+                        device=images.device,
+                        dtype=cls_logits.dtype
+                    )
+
                     if self.use_evidence:
                         cls_alpha = 1.0 + 100.0 * cls_probs
 
