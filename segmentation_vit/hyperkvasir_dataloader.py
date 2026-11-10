@@ -103,21 +103,9 @@ def initialize_segmentation_dataloaders(
     missing_masks = set(image_files) - set(mask_files)
     missing_images = set(mask_files) - set(image_files)
 
-    if missing_masks:
-        raise FileNotFoundError(
-            f"Missing masks for {len(missing_masks)} images: "
-            f"{sorted(missing_masks)[:10]}"
-        )
-
-    if missing_images:
-        raise FileNotFoundError(
-            f"Missing images for {len(missing_images)} masks: "
-            f"{sorted(missing_images)[:10]}"
-        )
-
     samples = [
         (image_files[name], mask_files[name])
-        for name in sorted(image_files)
+        for name in sorted(image_files.keys() & mask_files.keys())
     ]
 
     if len(samples) < 2:
