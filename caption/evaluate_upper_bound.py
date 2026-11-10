@@ -127,7 +127,7 @@ def evaluate(
 
         cls_gt = torch.stack([build_cls_gt(category, class_to_idx) for category in batch_categories]).to(device)
 
-        with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=device.type == "cuda",):
+        with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=device.type == "cuda",):
             generated = model.generate(images, max_new_tokens=max_new_tokens, cls_gt=cls_gt)
 
         predictions.extend(text.strip() for text in generated)
@@ -170,7 +170,7 @@ class OracleDataset(torch.utils.data.Dataset):
 
         original_index = self.subset.indices[index]
         image_path = self.subset.dataset.samples[original_index][0]
-        category = get_category(image_path, image_id, self.annotations)
+        category = get_category(image_path)
 
         return image, caption, image_id, category
 
