@@ -10,7 +10,7 @@ import torch.nn as nn
 import timm
 from torch.serialization import safe_globals
 from torch.torch_version import TorchVersion
-from segmentation_vit.segmentation_dataloader import initialize_segmentation_dataloaders
+from segmentation_vit.hyperkvasir_dataloader import initialize_segmentation_dataloaders
 
 
 class ConvBlock(nn.Module):
