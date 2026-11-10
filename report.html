@@ -433,21 +433,48 @@
         <h3>2.1.1 Dataset</h3>
 
         <p>
-            The segmentation experiments were conducted on a dataset
-            of gastrointestinal endoscopic images with corresponding
-            pixel-level segmentation masks.
-            The task was formulated as binary semantic segmentation,
+            Two datasets were used for the segmentation experiments:
+            <strong>ColonBench</strong> and
+            <strong>HyperKvasir Polyp</strong>.
+            Both datasets were used for binary semantic segmentation,
             distinguishing foreground regions from the background.
         </p>
 
         <p>
-            The dataset was randomly divided into training and
-            validation sets using an 85:15 split with a fixed
-            random seed of 42.
+            <strong>ColonBench.</strong>
+            The ColonBench segmentation dataset consists of
+            <strong>264 colonoscopy videos</strong> with corresponding
+            frame-level segmentation masks.
+            A total of
+            <span class="highlight">57,289 image–mask pairs</span>
+            were extracted from these videos for image-based segmentation.
         </p>
 
         <p>
-            All images and masks were resized to 224 × 224 pixels.
+            The ColonBench dataset was divided into training and validation
+            sets using an <strong>85:15 split within each video</strong>.
+            To prevent videos containing more frames from dominating
+            training, a video-balanced sampling strategy was applied.
+            Each training frame was assigned a sampling weight inversely
+            proportional to the number of training frames in its source
+            video. A weighted random sampler with replacement was used
+            to draw training samples, giving each video approximately
+            equal sampling probability.
+        </p>
+
+        <p>
+            <strong>HyperKvasir Polyp.</strong>
+            The HyperKvasir Polyp dataset contains
+            <span class="highlight">1,000 endoscopic images</span>
+            with corresponding pixel-level polyp segmentation masks.
+            The segmentation task was formulated as binary polyp
+            segmentation, distinguishing polyp regions from the
+            surrounding background.
+        </p>
+
+        <p>
+            For both datasets, images and masks were resized to
+            <strong>224 × 224 pixels</strong>.
             Bilinear interpolation was applied to images, while
             nearest-neighbor interpolation was used for masks
             to preserve discrete labels.
@@ -457,11 +484,12 @@
         <p>
             During training, random horizontal and vertical flipping
             were independently applied with a probability of 0.5.
-            The same spatial transformations were applied to
-            each image and its corresponding mask.
+            The same spatial transformations were applied to each
+            image and its corresponding mask.
         </p>
 
     </section>
+
 
 
     <!-- Experimental Configurations -->

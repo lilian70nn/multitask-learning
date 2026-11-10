@@ -1,7 +1,6 @@
 
 import argparse
 import json
-from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -32,32 +31,28 @@ CAPTION_TO_CLS = {
     ],
 }
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
-
-def get_class_to_idx(cls_data_dir):
-    paths = [
-        p for p in cls_data_dir.rglob("*")
-        if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
+def get_class_to_idx():
+    classes = [
+        "bbps-0-1",
+        "bbps-2-3",
+        "cecum",
+        "dyed-lifted-polyps",
+        "dyed-resection-margins",
+        "esophagitis-a",
+        "esophagitis-b-d",
+        "impacted-stool",
+        "polyps",
+        "pylorus",
+        "retroflex-rectum",
+        "retroflex-stomach",
+        "ulcerative-colitis-grade-1",
+        "ulcerative-colitis-grade-2",
+        "ulcerative-colitis-grade-3",
+        "z-line",
     ]
-    counts = Counter(p.parent.name for p in paths)
-    classes = sorted(name for name, count in counts.items() if count > 100)
 
-    if len(classes) != 16:
-        raise ValueError(f"Expected 16 classification classes, got {len(classes)}: {classes}")
-
-    class_to_idx = {name: idx for idx, name in enumerate(classes)}
-
-    for category, fine_classes in CAPTION_TO_CLS.items():
-        for fine_class in fine_classes:
-            if fine_class not in class_to_idx:
-                raise ValueError(f"Missing classification class {fine_class!r} required by caption category {category!r}")
-
-    print("Classification class order:")
-    for name, idx in class_to_idx.items():
-        print(f"  {idx}: {name}")
-
-    return class_to_idx
+    return {name: idx for idx, name in enumerate(classes)}
 
 
 def get_category(image_path):
@@ -184,7 +179,6 @@ def main():
     parser.add_argument("--seg_ckpt", required=True)
     parser.add_argument("--captioner_dir", required=True)
     parser.add_argument("--data_dir", default=str(Path.home() / "mtl_data" / "kvasir-dataset-v2"),)
-    parser.add_argument("--cls_data_dir", default=str(Path.home() / "mtl_data" / "labeled-images"))
     parser.add_argument("--qwen_name", default="Qwen/Qwen2.5-0.5B")
     parser.add_argument("--seg_grid_size", type=int, default=8)
     parser.add_argument("--batch_size", type=int, default=1)
@@ -197,7 +191,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     data_dir = Path(args.data_dir)
-    class_to_idx = get_class_to_idx(Path(args.cls_data_dir))
+    class_to_idx = get_class_to_idx()
     with open(data_dir / "all_annotations.json", encoding="utf-8",) as f:
         annotations = json.load(f)
 
