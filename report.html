@@ -41,9 +41,20 @@
             margin: 30px 0;
         }
 
+        .mermaid .nodeLabel p {
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.2 !important;
+        }
+
+        .mermaid .nodeLabel {
+            white-space: nowrap !important;
+        }
+
         .mermaid svg {
             display: block;
             width: 100%;
+            max-width: 100%;
             height: auto;
             margin: 0 auto;
         }
@@ -77,11 +88,15 @@
             color: #1e293b;
         }
 
-        p {
+
+        .container > p,
+        .card > p,
+        .figure-container > p {
             font-size: 16px;
             margin-bottom: 18px;
             color: #475569;
         }
+
 
         .card {
             background: transparent;
@@ -772,100 +787,15 @@
             Three baselines were designed with different feature combinations.
         </p>
 
-        <div class="mermaid">
-        flowchart TB
 
-            IMG["Input Image<br/>[3, 224, 224]"]
-
-            subgraph MODELS["1. Frozen Feature Extractors"]
-                direction LR
-                CLS["EDL Classifier"]
-                VIT["ViT-B/16"]
-                SEG["EDL Segmenter"]
-            end
-
-            IMG --> CLS
-            IMG --> VIT
-            IMG --> SEG
-
-            subgraph CLASSIFICATION["2A. Classification Features"]
-                direction TB
-
-                CL["Logits<br/>[16]"]
-                CA["Dirichlet Parameters<br/>α = softplus(logits) + 1<br/>[16]"]
-
-                CP["Prediction<br/>α / Σα<br/>[16]"]
-                CE["Evidence Features<br/>log(α)<br/>[16]"]
-
-                CPA["Prediction Adapter<br/>Linear: 16 → 896<br/>[1, 896]"]
-                CEA["Evidence Adapter<br/>Linear: 16 → 896<br/>[1, 896]"]
-
-                CL --> CA
-                CA --> CP
-                CA --> CE
-                CP --> CPA
-                CE --> CEA
-            end
-
-            subgraph VISUAL["2B. Visual Features"]
-                direction TB
-
-                VF["ViT Features<br/>[197, 768]"]
-                VA["Visual Adapter<br/>Linear: 768 → 896<br/>[197, 896]"]
-
-                VF --> VA
-            end
-
-            subgraph SEGMENTATION["2C. Segmentation Features"]
-                direction TB
-
-                SL["Logits<br/>[2, 224, 224]"]
-                SA["Dirichlet Parameters<br/>α = softplus(logits) + 1<br/>[2, 224, 224]"]
-
-                SP["Prediction<br/>α / Σα<br/>[2, 224, 224]"]
-                SE["Evidence Features<br/>log(α)<br/>[2, 224, 224]"]
-
-                SPA["Prediction Adapter<br/>Pool: [2, 8, 8]<br/>Flatten: [64, 2]<br/>Linear: 2 → 896<br/>[64, 896]"]
-
-                SEA["Evidence Adapter<br/>Pool: [2, 8, 8]<br/>Flatten: [64, 2]<br/>Linear: 2 → 896<br/>[64, 896]"]
-
-                SL --> SA
-                SA --> SP
-                SA --> SE
-                SP --> SPA
-                SE --> SEA
-            end
-
-            CLS --> CL
-            VIT --> VF
-            SEG --> SL
-
-            CPA --> CONCAT
-            CEA --> CONCAT
-            VA --> CONCAT
-            SPA --> CONCAT
-            SEA --> CONCAT
-
-            CONCAT["3. Token Concatenation<br/>197 + 1 + 1 + 64 + 64 = 327<br/>[327, 896]"]
-
-            CONCAT --> DEC["4. Qwen2.5-0.5B Decoder<br/>Hidden Size: 896"]
-            DEC --> OUT["Generated Caption"]
-
-            classDef frozen fill:#f1f5f9,stroke:#64748b,color:#334155;
-            classDef prediction fill:#dbeafe,stroke:#2563eb,color:#1e40af;
-            classDef evidence fill:#ffedd5,stroke:#ea580c,color:#9a3412;
-            classDef output fill:#dcfce7,stroke:#16a34a,color:#166534;
-
-            class CLS,VIT,SEG frozen;
-            class CP,CPA,VA,SP,SPA prediction;
-            class CE,CEA,SE,SEA evidence;
-            class DEC,OUT output;
-
-            style MODELS fill:#f8fafc,stroke:#cbd5e1
-            style CLASSIFICATION fill:#f8fafc,stroke:#cbd5e1
-            style VISUAL fill:#f8fafc,stroke:#cbd5e1
-            style SEGMENTATION fill:#f8fafc,stroke:#cbd5e1
+        <div style="width: 100%; overflow-x: auto; text-align: center; margin: 30px 0;">
+            <img
+                src="figures/architecture.svg"
+                alt="Architecture of Baseline 3"
+                style="display: block; width: 100%; height: auto; margin: 0 auto;"
+            >
         </div>
+
 
         <p class="figure-caption">
             Figure 5. Architecture of Baseline 3, incorporating visual,
