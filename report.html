@@ -147,20 +147,22 @@
             overflow-x: auto;
         }
 
+
         .confusion-wrapper {
             width: 100%;
-            height: 850px;
+            height: 510px;
             overflow: hidden;
         }
 
         .confusion-frame {
             display: block;
-            width: 1400px;
-            height: 1250px;
+            width: 1500px;
+            height: 850px;
             border: none;
-            transform: scale(0.67);
+            transform: scale(0.60);
             transform-origin: top left;
         }
+
 
         @media (max-width: 600px) {
             .container {
@@ -220,15 +222,15 @@
     </section>
 
 
+
     <!-- Experimental Configurations -->
     <section class="card">
-
         <h3>1.1.2 Experimental Configurations</h3>
 
         <p>
-            Four experimental settings were evaluated to investigate
-            the effects of backbone initialization strategies
-            and loss functions.
+            Two classification configurations were evaluated using a
+            GastroNet DINOv1-pretrained ViT-B/16 backbone to compare
+            Cross-Entropy (CE) and Evidential Deep Learning (EDL).
         </p>
 
         <table>
@@ -239,28 +241,14 @@
                     <th>Loss Function</th>
                 </tr>
             </thead>
-
             <tbody>
                 <tr>
                     <td><strong>1</strong></td>
-                    <td>ImageNet-pretrained ViT-B/16</td>
-                    <td>Cross-Entropy (CE)</td>
-                </tr>
-
-                <tr>
-                    <td><strong>2</strong></td>
-                    <td>ImageNet-pretrained ViT-B/16</td>
-                    <td>Evidential Deep Learning (EDL)</td>
-                </tr>
-
-                <tr>
-                    <td><strong>3</strong></td>
                     <td>GastroNet DINOv1-pretrained ViT-B/16</td>
                     <td>Cross-Entropy (CE)</td>
                 </tr>
-
                 <tr>
-                    <td><strong>4</strong></td>
+                    <td><strong>2</strong></td>
                     <td>GastroNet DINOv1-pretrained ViT-B/16</td>
                     <td>Evidential Deep Learning (EDL)</td>
                 </tr>
@@ -268,25 +256,14 @@
         </table>
 
         <p>
-            The ImageNet settings used a ViT-B/16 backbone initialized
-            with supervised ImageNet-pretrained weights.
+            The backbone was initialized with weights obtained from
+            self-supervised pretraining on GastroNet images.
+            CE used standard cross-entropy loss, while EDL used a
+            Dirichlet-based evidential loss to model classification
+            evidence and predictive uncertainty.
         </p>
-
-        <p>
-            The DINOv1 settings used a ViT-B/16 backbone initialized
-            with weights obtained from self-supervised pretraining
-            on GastroNet images.
-        </p>
-
-        <p>
-            For the CE settings, models were optimized using the
-            standard cross-entropy loss.
-            For the EDL settings, a Dirichlet-based evidential loss
-            was used to model classification evidence and estimate
-            predictive uncertainty.
-        </p>
-
     </section>
+
 
 
     <!-- Training Configuration -->
@@ -314,16 +291,18 @@
             validation Macro-F1 score.
         </p>
 
+
         <div class="note">
-            The same dataset split and ViT training configuration
-            were used across all four experimental settings
-            to ensure a consistent comparison.
+            The same dataset split and training configuration
+            were used for both CE and EDL.
         </div>
+
 
     </section>
 
     <!-- Experimental Results -->
     <h2>1.2 Experimental Results</h2>
+
 
     <!-- Training Curves -->
     <section class="card">
@@ -331,12 +310,11 @@
         <h3>1.2.1 Training Curves</h3>
 
         <p>
-            Figure 1 presents the validation Macro-F1 scores
-            across training epochs for the four experimental
-            configurations. The curves illustrate the
-            convergence behavior and classification performance
-            of different backbone initialization strategies
-            and loss functions.
+            Figure 1 presents the validation Macro-F1 scores across
+            training epochs for the two GastroNet DINOv1-based
+            classification configurations. The curves illustrate
+            the convergence behavior and classification performance
+            of Cross-Entropy (CE) and Evidential Deep Learning (EDL).
         </p>
 
         <div class="figure-container">
@@ -350,12 +328,14 @@
 
             <p class="figure-caption">
                 Figure 1. Validation Macro-F1 across training epochs
-                for the four experimental configurations.
+                for GastroNet DINO + CE and GastroNet DINO + EDL.
                 Hover over the curves to inspect individual values.
             </p>
         </div>
 
     </section>
+
+
 
 
     <!-- Classification Performance -->
@@ -364,8 +344,8 @@
         <h3>1.2.2 Classification Performance</h3>
 
         <p>
-            Table 2 summarizes the final classification performance
-            of the four experimental configurations using
+            Table 2 summarizes the validation classification performance
+            of the two GastroNet DINOv1-based configurations using
             Accuracy, Macro-F1, and Weighted-F1.
         </p>
 
@@ -374,21 +354,42 @@
                 <thead>
                     <tr>
                         <th>Model</th>
-                        <th>Accuracy</th>
-                        <th>Macro-F1</th>
-                        <th>Weighted-F1</th>
+                        <th>Accuracy ↑</th>
+                        <th>Macro-F1 ↑</th>
+                        <th>Weighted-F1 ↑</th>
                     </tr>
                 </thead>
 
-                <tbody id="classification-results">
+                <tbody>
                     <tr>
-                        <td colspan="4">Loading results...</td>
+                        <td>GastroNet DINO + CE</td>
+                        <td><strong>0.9413</strong></td>
+                        <td><strong>0.8969</strong></td>
+                        <td><strong>0.9415</strong></td>
+                    </tr>
+
+                    <tr>
+                        <td>GastroNet DINO + EDL</td>
+                        <td>0.9323</td>
+                        <td>0.8802</td>
+                        <td>0.9318</td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
+        <p class="figure-caption">
+            Table 2. Classification performance on the validation set.
+        </p>
+
+        <p>
+            GastroNet DINO + CE outperformed GastroNet DINO + EDL
+            across all three classification metrics.
+        </p>
+
     </section>
+
+
 
 
     <!-- Confusion Matrices -->
@@ -397,8 +398,11 @@
         <h3>1.2.3 Confusion Matrices</h3>
 
         <p>
-            Figure 2 presents the confusion matrices for
-            the four experimental configurations.
+            Figure 2 presents the row-normalized confusion matrices
+            for the two GastroNet DINOv1-based classification
+            configurations: Cross-Entropy (CE) and Evidential Deep
+            Learning (EDL).
+
             The horizontal axis represents predicted classes,
             while the vertical axis represents ground-truth classes.
             Cell colors indicate row-normalized proportions.
@@ -409,18 +413,19 @@
         <div class="confusion-wrapper">
             <iframe
                 class="confusion-frame"
-                src="classification_vit/figures/hierarchical_confusion_matrices.html"
+                src="figures/hierarchical_confusion_matrices.html"
                 title="Interactive Confusion Matrices"
                 loading="lazy">
             </iframe>
         </div>
 
         <p class="figure-caption">
-            Figure 2. Row-normalized confusion matrices
-            for the four experimental configurations.
+            Figure 2. Row-normalized confusion matrices for
+            GastroNet DINO + CE (left) and GastroNet DINO + EDL (right).
         </p>
 
     </section>
+
 
     <!-- Segmentation -->
     <h1>2. Segmentation</h1>
@@ -498,68 +503,61 @@
         <h3>2.1.2 Experimental Configurations</h3>
 
         <p>
-            Four experimental configurations were designed to evaluate
-            the effects of backbone initialization and loss functions
-            on segmentation performance.
+        Four segmentation experiments were conducted using a fixed
+        GastroNet DINOv1-pretrained ViT-B/16 backbone. The experiments
+        cover two datasets, ColonBench (Video Balanced) and HyperKvasir
+        Polyp, with two training loss configurations: CE and EDL.
         </p>
 
         <table>
-            <thead>
-                <tr>
-                    <th>Setting</th>
-                    <th>Backbone Initialization</th>
-                    <th>Loss Function</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                <tr>
-                    <td><strong>1</strong></td>
-                    <td>ImageNet-pretrained ViT-B/16</td>
-                    <td>Cross-Entropy + Dice</td>
-                </tr>
-
-                <tr>
-                    <td><strong>2</strong></td>
-                    <td>ImageNet-pretrained ViT-B/16</td>
-                    <td>Evidential Deep Learning (EDL)</td>
-                </tr>
-
-                <tr>
-                    <td><strong>3</strong></td>
-                    <td>GastroNet DINOv1-pretrained ViT-B/16</td>
-                    <td>Cross-Entropy + Dice</td>
-                </tr>
-
-                <tr>
-                    <td><strong>4</strong></td>
-                    <td>GastroNet DINOv1-pretrained ViT-B/16</td>
-                    <td>Evidential Deep Learning (EDL)</td>
-                </tr>
-            </tbody>
+        <thead>
+            <tr>
+            <th>Configuration</th>
+            <th>Dataset</th>
+            <th>Backbone</th>
+            <th>Loss</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+            <td>1</td>
+            <td>ColonBench</td>
+            <td>GastroNet DINOv1 ViT-B/16</td>
+            <td>CE</td>
+            </tr>
+            <tr>
+            <td>2</td>
+            <td>ColonBench</td>
+            <td>GastroNet DINOv1 ViT-B/16</td>
+            <td>EDL</td>
+            </tr>
+            <tr>
+            <td>3</td>
+            <td>HyperKvasir Polyp</td>
+            <td>GastroNet DINOv1 ViT-B/16</td>
+            <td>CE</td>
+            </tr>
+            <tr>
+            <td>4</td>
+            <td>HyperKvasir Polyp</td>
+            <td>GastroNet DINOv1 ViT-B/16</td>
+            <td>EDL</td>
+            </tr>
+        </tbody>
         </table>
 
         <p>
-            All configurations used a ViT-B/16 encoder combined
-            with a convolutional segmentation decoder.
-            The encoder extracted patch-level features, which were
-            reshaped into spatial feature maps and progressively
-            upsampled to generate pixel-level predictions.
+        The backbone and segmentation architecture were kept fixed
+        across all four configurations to investigate the effect of
+        the training loss within each dataset. CE and EDL were compared
+        separately on ColonBench and HyperKvasir Polyp.
         </p>
 
         <p>
-            The ImageNet configurations initialized the encoder
-            using supervised ImageNet-pretrained weights.
-            The DINOv1 configurations initialized the encoder
-            using self-supervised weights pretrained on GastroNet images.
-        </p>
-
-        <p>
-            For the CE configurations, the training objective combined
-            cross-entropy loss and soft Dice loss.
-            For the EDL configurations, a Dirichlet-based evidential
-            loss was used to model pixel-level classification evidence
-            and estimate predictive uncertainty.
+        Since the two datasets have different image distributions and
+        validation sets, Dice and IoU results are reported separately
+        for each dataset rather than used to directly rank all four
+        configurations.
         </p>
 
     </section>
@@ -568,40 +566,35 @@
     <!-- Training Configuration -->
     <section class="card">
 
+
         <h3>2.1.3 Training Configuration</h3>
 
         <p>
-            All segmentation models were fine-tuned using the AdamW
-            optimizer with a learning rate of
-            <span class="highlight">1 × 10⁻⁴</span>
-            and a weight decay of
-            <span class="highlight">1 × 10⁻⁴</span>.
+        All experiments used a ViT-B/16 encoder with a convolutional
+        segmentation decoder. The models were trained end-to-end
+        using AdamW with a learning rate of 1 × 10⁻⁴ and weight
+        decay of 1 × 10⁻⁴, for 50 epochs with a batch size of 256.
         </p>
 
         <p>
-            Training was performed for
-            <strong>50 epochs</strong>
-            with a batch size of
-            <strong>256</strong>.
+        The CE configuration combined cross-entropy and Dice loss,
+        while the EDL configuration used a Dirichlet-based evidential
+        loss without an additional Dice term.
         </p>
 
         <p>
-            Segmentation performance was evaluated using the
-            Dice coefficient and Intersection over Union (IoU).
-            The best checkpoint was selected based on the highest
-            validation Dice score.
+        The best checkpoint was selected based on the highest
+        validation Dice score. Dice and IoU were used to evaluate
+        segmentation performance, with predictive uncertainty
+        additionally recorded for EDL.
         </p>
 
-        <div class="note">
-            The same dataset split, encoder-decoder architecture,
-            and training configuration were used across all four
-            experimental settings to ensure a consistent comparison.
-        </div>
 
     </section>
 
     <!-- Segmentation Experimental Results -->
     <h2>2.2 Experimental Results</h2>
+
 
     <!-- Training Curves -->
     <section class="card">
@@ -609,18 +602,25 @@
         <h3>2.2.1 Training Curves</h3>
 
         <p>
-            Figure 3 presents the training and validation loss,
-            validation Dice, and validation IoU across training
-            epochs for the four experimental configurations.
-            These curves illustrate the convergence behavior
-            and segmentation performance of different backbone
-            initialization strategies and loss functions.
+            Figure 3 presents the training loss, validation loss,
+            validation Dice, and validation IoU across training epochs
+            for the four segmentation configurations.
+            CE and EDL are compared within each dataset:
+            ColonBench and HyperKvasir Polyp.
+        </p>
+
+        <p>
+            The loss curves illustrate training convergence,
+            while Dice and IoU measure segmentation performance.
+            Since CE and EDL use different loss functions,
+            their loss values are not directly comparable.
+            Performance comparisons are made within each dataset.
         </p>
 
         <div class="figure-container">
             <iframe
                 class="figure-frame"
-                src="segmentation_vit/figures/training_curves.html"
+                src="figures/seg_training_curves.html"
                 title="Interactive Segmentation Training Curves"
                 height="850"
                 loading="lazy">
@@ -628,13 +628,16 @@
 
             <p class="figure-caption">
                 Figure 3. Training loss, validation loss,
-                validation Dice, and validation IoU
-                across training epochs.
-                Hover over the curves to inspect individual values.
+                validation Dice, and validation IoU across training
+                epochs for CE and EDL on ColonBench (Video Balanced)
+                and HyperKvasir Polyp. Hover over the curves
+                to inspect individual values.
             </p>
         </div>
 
     </section>
+
+
 
 
     <!-- Segmentation Performance -->
@@ -643,11 +646,10 @@
         <h3>2.2.2 Segmentation Performance</h3>
 
         <p>
-            Table 3 summarizes the segmentation performance
-            of the four experimental configurations.
-            The best checkpoint for each configuration was
-            selected based on the highest validation Dice score.
-            Dice and IoU are reported at the corresponding epoch.
+            Table 3 summarizes the segmentation performance of the four
+            experimental configurations. For each configuration, the
+            checkpoint with the highest validation Dice score was selected,
+            and Dice and IoU are reported at the corresponding epoch.
         </p>
 
         <div class="table-wrapper">
@@ -661,15 +663,57 @@
                     </tr>
                 </thead>
 
-                <tbody id="segmentation-results">
+
+                <tbody>
                     <tr>
-                        <td colspan="4">Loading results...</td>
+                        <td>ColonBench - CE</td>
+                        <td>3</td>
+                        <td><strong>0.4028</strong></td>
+                        <td><strong>0.3205</strong></td>
+                    </tr>
+                    <tr>
+                        <td>ColonBench - EDL</td>
+                        <td>4</td>
+                        <td>0.3385</td>
+                        <td>0.2697</td>
+                    </tr>
+                    <tr>
+                        <td>HyperKvasir Polyp - CE</td>
+                        <td>45</td>
+                        <td><strong>0.8847</strong></td>
+                        <td><strong>0.8195</strong></td>
+                    </tr>
+                    <tr>
+                        <td>HyperKvasir Polyp - EDL</td>
+                        <td>42</td>
+                        <td>0.8807</td>
+                        <td>0.8114</td>
                     </tr>
                 </tbody>
+
             </table>
         </div>
 
+        <p>
+            On ColonBench, CE achieved a Dice score of
+            <strong>0.4028</strong> and an IoU of
+            <strong>0.3205</strong>, outperforming EDL
+            (Dice: 0.3385; IoU: 0.2697).
+        </p>
+
+        <p>
+            On HyperKvasir Polyp, both configurations achieved
+            substantially higher segmentation scores.
+            CE obtained a Dice score of <strong>0.8847</strong>
+            and an IoU of <strong>0.8195</strong>, compared with
+            0.8807 and 0.8114 for EDL, respectively.
+            The performance difference between CE and EDL
+            was relatively small on this dataset.
+        </p>
+
     </section>
+
+
 
 
     <!-- Qualitative Results -->
@@ -678,166 +722,189 @@
         <h3>2.2.3 Qualitative Results</h3>
 
         <p>
-            Figure 4 presents qualitative segmentation results
-            for four validation images.
-            The original images and ground-truth masks are shown
-            alongside the predictions from the four experimental
-            configurations.
-            All models were evaluated on the same images
-            to facilitate visual comparison.
+            Figure 4 presents qualitative segmentation results for
+            four selected samples: two from ColonBench and two from
+            HyperKvasir Polyp. Each row displays the original image,
+            ground-truth mask, and predictions from the CE and EDL models.
+        </p>
+
+        <p>
+            CE and EDL predictions are compared on the same images
+            within each dataset, allowing visual assessment of
+            segmentation boundaries and foreground regions.
         </p>
 
         <div class="figure-container">
             <img
-                src="segmentation_vit/figures/qualitative_results.png"
-                alt="Qualitative segmentation results"
+                src="figures/qualitative_results.png"
+                alt="Qualitative segmentation comparison on ColonBench and HyperKvasir Polyp"
                 style="display: block; width: 100%; height: auto;">
 
             <p class="figure-caption">
-                Figure 4. Qualitative comparison of segmentation
-                predictions from the four experimental configurations.
+                Figure 4. Qualitative segmentation results on ColonBench
+                (top two rows) and HyperKvasir Polyp (bottom two rows).
+                Columns show the original image, ground truth, CE prediction,
+                and EDL prediction.
             </p>
         </div>
 
     </section>
 
 
+
+
     <!-- Image Captioning -->
     <h1>3. Image Captioning</h1>
 
+    
     <h2>3.1 Model Architecture</h2>
-
-
-    <h3>3.1.1 Overall Architecture (Baseline 3)</h3>
-
-    <p>
-        Figure 5 illustrates the complete architecture of Baseline 3.
-        Tensor shapes are shown for a single input image, with the batch
-        dimension omitted.
-    </p>
-
-    <div class="mermaid">
-    flowchart TB
-
-        IMG["Input Image<br/>[3, 224, 224]"]
-
-        subgraph MODELS["1. Frozen Feature Extractors"]
-            direction LR
-            CLS["EDL Classifier"]
-            VIT["ViT-B/16"]
-            SEG["EDL Segmenter"]
-        end
-
-        IMG --> CLS
-        IMG --> VIT
-        IMG --> SEG
-
-        subgraph CLASSIFICATION["2A. Classification Features"]
-            direction TB
-
-            CL["Logits<br/>[16]"]
-            CA["Dirichlet Parameters<br/>α = softplus(logits) + 1<br/>[16]"]
-
-            CP["Prediction<br/>α / Σα<br/>[16]"]
-            CE["Evidence Features<br/>log(α)<br/>[16]"]
-
-            CPA["Prediction Adapter<br/>Linear: 16 → 896<br/>[1, 896]"]
-            CEA["Evidence Adapter<br/>Linear: 16 → 896<br/>[1, 896]"]
-
-            CL --> CA
-            CA --> CP
-            CA --> CE
-            CP --> CPA
-            CE --> CEA
-        end
-
-        subgraph VISUAL["2B. Visual Features"]
-            direction TB
-
-            VF["ViT Features<br/>[197, 768]"]
-            VA["Visual Adapter<br/>Linear: 768 → 896<br/>[197, 896]"]
-
-            VF --> VA
-        end
-
-        subgraph SEGMENTATION["2C. Segmentation Features"]
-            direction TB
-
-            SL["Logits<br/>[2, 224, 224]"]
-            SA["Dirichlet Parameters<br/>α = softplus(logits) + 1<br/>[2, 224, 224]"]
-
-            SP["Prediction<br/>α / Σα<br/>[2, 224, 224]"]
-            SE["Evidence Features<br/>log(α)<br/>[2, 224, 224]"]
-
-            SPA["Prediction Adapter<br/>Pool: [2, 8, 8]<br/>Flatten: [64, 2]<br/>Linear: 2 → 896<br/>[64, 896]"]
-
-            SEA["Evidence Adapter<br/>Pool: [2, 8, 8]<br/>Flatten: [64, 2]<br/>Linear: 2 → 896<br/>[64, 896]"]
-
-            SL --> SA
-            SA --> SP
-            SA --> SE
-            SP --> SPA
-            SE --> SEA
-        end
-
-        CLS --> CL
-        VIT --> VF
-        SEG --> SL
-
-        CPA --> CONCAT
-        CEA --> CONCAT
-        VA --> CONCAT
-        SPA --> CONCAT
-        SEA --> CONCAT
-
-        CONCAT["3. Token Concatenation<br/>197 + 1 + 1 + 64 + 64 = 327<br/>[327, 896]"]
-
-        CONCAT --> DEC["4. Qwen2.5-0.5B Decoder<br/>Hidden Size: 896"]
-        DEC --> OUT["Generated Caption"]
-
-        classDef frozen fill:#f1f5f9,stroke:#64748b,color:#334155;
-        classDef prediction fill:#dbeafe,stroke:#2563eb,color:#1e40af;
-        classDef evidence fill:#ffedd5,stroke:#ea580c,color:#9a3412;
-        classDef output fill:#dcfce7,stroke:#16a34a,color:#166534;
-
-        class CLS,VIT,SEG frozen;
-        class CP,CPA,VA,SP,SPA prediction;
-        class CE,CEA,SE,SEA evidence;
-        class DEC,OUT output;
-
-        style MODELS fill:#f8fafc,stroke:#cbd5e1
-        style CLASSIFICATION fill:#f8fafc,stroke:#cbd5e1
-        style VISUAL fill:#f8fafc,stroke:#cbd5e1
-        style SEGMENTATION fill:#f8fafc,stroke:#cbd5e1
-    </div>
-
-    <p class="figure-caption">
-        Figure 5. Baseline 3 architecture with tensor dimensions.
-        Classification and segmentation outputs are separated into
-        probability and evidential branches. All five feature sequences
-        are projected into the 896-dimensional Qwen embedding space
-        before concatenation.
-    </p>
-
-    <p>
-        The prediction branches encode normalized Dirichlet
-        probabilities, whereas the evidence branches encode
-        log-transformed Dirichlet parameters.
-    </p>
-
-    <p>
-        Separate trainable adapters project all five feature sequences
-        into the 896-dimensional embedding space required by
-        Qwen2.5-0.5B. The resulting sequences are concatenated
-        along the token dimension to form a multimodal prefix
-        of shape [327, 896].
-    </p>
 
     <section class="card">
 
         <p>
-            Three image captioning baselines were implemented using
-            ViT-B/16 and Qwen2.5-0.5B.
+            The image captioning framework integrates visual features
+            from a ViT-B/16 encoder with classification and segmentation
+            features to condition Qwen2.5-0.5B for caption generation.
+            Three baselines were designed with different feature combinations.
+        </p>
+
+        <div class="mermaid">
+        flowchart TB
+
+            IMG["Input Image<br/>[3, 224, 224]"]
+
+            subgraph MODELS["1. Frozen Feature Extractors"]
+                direction LR
+                CLS["EDL Classifier"]
+                VIT["ViT-B/16"]
+                SEG["EDL Segmenter"]
+            end
+
+            IMG --> CLS
+            IMG --> VIT
+            IMG --> SEG
+
+            subgraph CLASSIFICATION["2A. Classification Features"]
+                direction TB
+
+                CL["Logits<br/>[16]"]
+                CA["Dirichlet Parameters<br/>α = softplus(logits) + 1<br/>[16]"]
+
+                CP["Prediction<br/>α / Σα<br/>[16]"]
+                CE["Evidence Features<br/>log(α)<br/>[16]"]
+
+                CPA["Prediction Adapter<br/>Linear: 16 → 896<br/>[1, 896]"]
+                CEA["Evidence Adapter<br/>Linear: 16 → 896<br/>[1, 896]"]
+
+                CL --> CA
+                CA --> CP
+                CA --> CE
+                CP --> CPA
+                CE --> CEA
+            end
+
+            subgraph VISUAL["2B. Visual Features"]
+                direction TB
+
+                VF["ViT Features<br/>[197, 768]"]
+                VA["Visual Adapter<br/>Linear: 768 → 896<br/>[197, 896]"]
+
+                VF --> VA
+            end
+
+            subgraph SEGMENTATION["2C. Segmentation Features"]
+                direction TB
+
+                SL["Logits<br/>[2, 224, 224]"]
+                SA["Dirichlet Parameters<br/>α = softplus(logits) + 1<br/>[2, 224, 224]"]
+
+                SP["Prediction<br/>α / Σα<br/>[2, 224, 224]"]
+                SE["Evidence Features<br/>log(α)<br/>[2, 224, 224]"]
+
+                SPA["Prediction Adapter<br/>Pool: [2, 8, 8]<br/>Flatten: [64, 2]<br/>Linear: 2 → 896<br/>[64, 896]"]
+
+                SEA["Evidence Adapter<br/>Pool: [2, 8, 8]<br/>Flatten: [64, 2]<br/>Linear: 2 → 896<br/>[64, 896]"]
+
+                SL --> SA
+                SA --> SP
+                SA --> SE
+                SP --> SPA
+                SE --> SEA
+            end
+
+            CLS --> CL
+            VIT --> VF
+            SEG --> SL
+
+            CPA --> CONCAT
+            CEA --> CONCAT
+            VA --> CONCAT
+            SPA --> CONCAT
+            SEA --> CONCAT
+
+            CONCAT["3. Token Concatenation<br/>197 + 1 + 1 + 64 + 64 = 327<br/>[327, 896]"]
+
+            CONCAT --> DEC["4. Qwen2.5-0.5B Decoder<br/>Hidden Size: 896"]
+            DEC --> OUT["Generated Caption"]
+
+            classDef frozen fill:#f1f5f9,stroke:#64748b,color:#334155;
+            classDef prediction fill:#dbeafe,stroke:#2563eb,color:#1e40af;
+            classDef evidence fill:#ffedd5,stroke:#ea580c,color:#9a3412;
+            classDef output fill:#dcfce7,stroke:#16a34a,color:#166534;
+
+            class CLS,VIT,SEG frozen;
+            class CP,CPA,VA,SP,SPA prediction;
+            class CE,CEA,SE,SEA evidence;
+            class DEC,OUT output;
+
+            style MODELS fill:#f8fafc,stroke:#cbd5e1
+            style CLASSIFICATION fill:#f8fafc,stroke:#cbd5e1
+            style VISUAL fill:#f8fafc,stroke:#cbd5e1
+            style SEGMENTATION fill:#f8fafc,stroke:#cbd5e1
+        </div>
+
+        <p class="figure-caption">
+            Figure 5. Architecture of Baseline 3, incorporating visual,
+            classification, segmentation, and evidential features.
+        </p>
+
+        <p>
+            In Baseline 3, probability and evidence features are projected
+            alongside visual features into the 896-dimensional Qwen
+            embedding space. The resulting 327 tokens are concatenated
+            to form a multimodal prefix for autoregressive caption generation.
+        </p>
+
+    </section>
+
+
+
+
+    <h2>3.2 Experimental Settings</h2>
+
+
+    <section class="card">
+        <h3>3.2.1 Dataset</h3>
+
+        <p>
+            The image captioning experiments used Kvasir Dataset v2,
+            containing gastrointestinal endoscopic images across
+            eight categories, including polyps, esophagitis,
+            ulcerative colitis, and normal anatomical findings.
+            The dataset includes textual descriptions associated
+            with the images, which provide supervision for
+            caption generation.
+        </p>
+    </section>
+
+
+    <section class="card">
+        <h3>3.2.2 Experimental Configurations</h3>
+
+        <p>
+            Three baselines were evaluated to investigate the
+            contribution of classification, segmentation, and
+            evidential features to image captioning.
         </p>
 
         <table>
@@ -845,154 +912,199 @@
                 <tr>
                     <th>Baseline</th>
                     <th>Input Features</th>
-                    <th>Number of Tokens</th>
+                    <th>Tokens</th>
                 </tr>
             </thead>
-
             <tbody>
                 <tr>
-                    <td><strong>1</strong></td>
+                    <td>1</td>
                     <td>ViT visual features</td>
                     <td>197</td>
                 </tr>
-
                 <tr>
-                    <td><strong>2</strong></td>
-                    <td>ViT + CE classification probabilities + CE segmentation probabilities</td>
+                    <td>2</td>
+                    <td>ViT + CE classification and segmentation probabilities</td>
                     <td>262</td>
                 </tr>
-
                 <tr>
-                    <td><strong>3</strong></td>
-                    <td>ViT + EDL classification probabilities and evidence + EDL segmentation probabilities and evidence</td>
+                    <td>3</td>
+                    <td>ViT + EDL classification and segmentation probabilities and evidence</td>
                     <td>327</td>
                 </tr>
             </tbody>
         </table>
 
-        <p>
-            The framework loads three independent checkpoints:
-            a pretrained ViT-B/16 encoder, a trained classification
-            model, and a trained segmentation model.
-            Baseline 1 uses only the ViT checkpoint, while
-            Baselines 2 and 3 additionally use the classification
-            and segmentation checkpoints.
-        </p>
 
         <p>
-            The ViT encoder produces 197 visual tokens.
-            Classification probabilities are projected into one token,
-            while segmentation probability maps are pooled into
-            an 8 × 8 grid to produce 64 tokens.
-            Baseline 3 additionally incorporates 65 evidence tokens
-            from the EDL classification and segmentation models.
+            For Baselines 2 and 3, two segmentation models were used,
+            trained separately on ColonBench and HyperKvasir Polyp.
+            Baseline 2 used CE-trained segmenters, while Baseline 3
+            used EDL-trained segmenters. Together with Baseline 1,
+            this resulted in five captioning configurations.
         </p>
-
-        <p>
-            All features are projected into Qwen's embedding dimension
-            using separate linear adapters and concatenated into
-            a single multimodal token sequence.
-            This sequence is passed to Qwen2.5-0.5B as a prefix
-            for autoregressive caption generation.
-        </p>
-
-        <div class="note">
-            The captioning framework has been implemented for all
-            three baselines. The pretrained feature extractors are
-            frozen, while the multimodal adapters and Qwen decoder
-            are trained for image caption generation.
-        </div>
 
     </section>
 
-    <!-- Captioning Experimental Settings -->
-    <h2>3.2 Experimental Settings</h2>
-
     <section class="card">
-
-        <h3>3.2.1 Dataset</h3>
-
-        <p>
-            The image captioning experiments were conducted using
-            a subset of polyp images from the dataset employed
-            in the segmentation experiments.
-        </p>
+        <h3>3.2.3 Training Configuration</h3>
 
         <p>
-            A total of <strong>1,000 polyp images</strong> were selected
-            for the captioning task. Since manually annotated image
-            captions were not available, Qwen2.5-VL-3B-Instruct
-            was used to generate pseudo-captions for the selected
-            images. These generated descriptions served as reference
-            captions for model training and evaluation.
+            The pretrained feature extractors were frozen, while
+            the multimodal adapters and Qwen2.5-0.5B decoder
+            were trained for caption generation.
         </p>
-
-        <p>
-            The dataset was randomly divided into training and
-            validation sets using an <strong>80:20 split</strong>
-            with a fixed random seed of <strong>42</strong>,
-            resulting in <strong>800 training images</strong>
-            and <strong>200 validation images</strong>.
-        </p>
-
-        <p>
-            The same dataset split and reference captions were
-            used across all three captioning baselines to ensure
-            a consistent comparison.
-        </p>
-
     </section>
 
     <h2>3.3 Experimental Results</h2>
-
+    <!-- Training Curves -->
     <section class="card">
-
-        <h3>3.3.1 Captioning Performance</h3>
+        <h3>3.3.1 Training Curves</h3>
 
         <p>
-            Table 4 presents the captioning performance of the
-            three baselines on the validation set.
-            Results are reported using the best validation loss,
-            BLEU, and BERTScore F1.
+            Figure 6 presents the training and validation loss
+            across epochs for the five captioning configurations,
+            comparing the convergence behavior of the three baselines
+            with different segmentation feature extractors.
+        </p>
+
+        <div class="figure-container">
+            <iframe
+                class="figure-frame"
+                src="figures/caption_training_curves.html"
+                title="Interactive Captioning Training Curves"
+                height="600"
+                loading="lazy">
+            </iframe>
+
+            <p class="figure-caption">
+                Figure 6. Training and validation loss across epochs
+                for the five captioning configurations.
+            </p>
+        </div>
+    </section>
+
+
+
+    <!-- Captioning Performance -->
+    <section class="card">
+        <h3>3.3.2 Captioning Performance</h3>
+
+        <p>
+            Table 4 compares the five captioning configurations using
+            validation loss, BLEU, and BERTScore F1.
+            The Oracle columns report performance when predicted
+            classification probabilities are replaced with ground-truth
+            class information, while the segmentation features remain unchanged.
+            Higher BLEU and BERTScore F1 indicate better caption quality.
         </p>
 
         <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
-                        <th>Baseline</th>
+                        <th>Configuration</th>
                         <th>Best Val Loss ↓</th>
                         <th>BLEU ↑</th>
+                        <th>Oracle BLEU ↑</th>
                         <th>BERTScore F1 ↑</th>
+                        <th>Oracle BERTScore F1 ↑</th>
                     </tr>
                 </thead>
-
                 <tbody>
                     <tr>
                         <td>Baseline 1</td>
-                        <td><strong>0.3774</strong></td>
-                        <td>48.6525</td>
-                        <td><strong>0.9460</strong></td>
+                        <td><strong>0.9145</strong></td>
+                        <td><strong>39.2021</strong></td>
+                        <td>—</td>
+                        <td>0.9452</td>
+                        <td>—</td>
                     </tr>
-
                     <tr>
-                        <td>Baseline 2</td>
-                        <td>0.3843</td>
-                        <td>48.1534</td>
-                        <td>0.9407</td>
+                        <td>Baseline 2 - ColonBench</td>
+                        <td>0.9256</td>
+                        <td>37.6185</td>
+                        <td>37.8867</td>
+                        <td><strong>0.9455</strong></td>
+                        <td><strong>0.9455</strong></td>
                     </tr>
-
                     <tr>
-                        <td>Baseline 3</td>
-                        <td>0.3813</td>
-                        <td><strong>50.8138</strong></td>
-                        <td>0.9458</td>
+                        <td>Baseline 2 - Polyp</td>
+                        <td>0.9203</td>
+                        <td>38.6805</td>
+                        <td><strong>38.7351</strong></td>
+                        <td>0.9453</td>
+                        <td>0.9452</td>
+                    </tr>
+                    <tr>
+                        <td>Baseline 3 - ColonBench</td>
+                        <td>0.9169</td>
+                        <td>37.5911</td>
+                        <td>37.3830</td>
+                        <td>0.9389</td>
+                        <td>0.9389</td>
+                    </tr>
+                    <tr>
+                        <td>Baseline 3 - Polyp</td>
+                        <td>0.9254</td>
+                        <td>36.7354</td>
+                        <td>36.9933</td>
+                        <td>0.9423</td>
+                        <td>0.9423</td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
+        <p class="figure-caption">
+            Table 4. Captioning performance on the validation set.
+            Oracle evaluation is applicable only to Baselines 2 and 3.
+        </p>
+
+        <p>
+            Baseline 1 achieved the lowest validation loss and highest
+            standard BLEU score, while Baseline 2 - ColonBench achieved
+            the highest BERTScore F1.
+            Classification Oracle evaluation produced small BLEU changes,
+            with no consistent improvement across configurations.
+        </p>
     </section>
+
+
+
+    <section class="card">
+        <h3>3.3.3 Qualitative Results</h3>
+
+        <p>
+            Figure 7 compares reference captions with predictions from
+            the five configurations and their classification Oracle variants.
+        </p>
+
+        <div class="figure-container">
+            <iframe
+                class="figure-frame"
+                src="figures/caption_qualitative.html"
+                title="Qualitative Captioning Results"
+                height="2400"
+                loading="lazy">
+            </iframe>
+
+            <p class="figure-caption">
+                Figure 7. Qualitative comparison of generated captions
+                on three validation images.
+            </p>
+        </div>
+
+        <p>
+            The models describe normal anatomical findings consistently,
+            but some generated captions omit polyps present in the
+            reference descriptions. Classification Oracle inputs produce
+            limited changes in these examples.
+        </p>
+    </section>
+
+
+
+
 
 </div>
 
