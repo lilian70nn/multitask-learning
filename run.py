@@ -27,6 +27,8 @@ SEG_PATHS = {
     "edl": "segmentation/vit_gastronet_dino_edl_colonbench/best_model.pt",
 }
 
+SEG_POLYP_PATH = "segmentation/vit_gastronet_dino_ce_polyp/best_model.pt"
+
 CAPTION_PATH = "decoder/dino_gastronet_hierarchical_colonbench"
 VIT_PATH = "dino-weights/ema_backbone.pt"
 
@@ -36,13 +38,16 @@ def get_checkpoint_root(paths):
 
 
 class GastroNet:
-    def __init__(self, task="classification", baseline=1, device=None):
+    def __init__(self, task="classification", baseline=1, dataset="colonbench", device=None):
         self.task = task.lower()
         self.baseline = baseline
+        self.dataset = dataset.lower()
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
 
         if self.task not in ("classification", "segmentation", "captioning"):
             raise ValueError("task must be classification, segmentation, or captioning")
+        if self.task == "segmentation" and self.dataset not in ("colonbench", "polyp"):
+            raise ValueError("dataset must be colonbench or polyp")
         if self.task == "captioning" and self.baseline not in (1, 2, 3):
             raise ValueError("baseline must be 1, 2, or 3")
 
@@ -71,7 +76,7 @@ class GastroNet:
         self.class_names = {int(k): v for k, v in groups["original_classes"].items()}
 
     def _load_segmentation(self):
-        seg_path = SEG_PATHS["ce"]
+        seg_path = SEG_PATHS["ce"] if self.dataset == "colonbench" else SEG_POLYP_PATH
         root = get_checkpoint_root([seg_path])
         state = torch.load(root / seg_path, map_location="cpu", weights_only=True)
         num_classes = state["decoder.5.weight"].shape[0]
