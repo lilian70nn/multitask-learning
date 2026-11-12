@@ -225,10 +225,21 @@ class HierarchicalClassifier(nn.Module):
 
         for group_id, classes in self.merge_groups.items():
             specialist = AutoModelForImageClassification.from_pretrained(SWIN_NAME, num_labels=len(classes), ignore_mismatched_sizes=True)
-            specialist.load_state_dict(
-                torch.load(ckpt_dir / f"swin_group_{group_id}_best_model.pt", map_location="cpu", weights_only=True,),
-                strict=True,
-            )
+            state = torch.load(ckpt_dir / f"swin_group_{group_id}_best_model.pt", map_location="cpu", weights_only=True)
+            converted = {}
+            for k, v in state.items():
+                k = k.replace(".attention.q_proj.", ".attention.self.query.")
+                k = k.replace(".attention.k_proj.", ".attention.self.key.")
+                k = k.replace(".attention.v_proj.", ".attention.self.value.")
+                k = k.replace(".attention.o_proj.", ".attention.output.dense.")
+                k = k.replace(".mlp.fc1.", ".intermediate.dense.")
+                k = k.replace(".mlp.fc2.", ".output.dense.")
+                k = k.replace(".attention.relative_position_bias.relative_position_bias_table", ".attention.self.relative_position_bias_table")
+                converted[k] = v
+            for k, v in specialist.state_dict().items():
+                if k.endswith(".relative_position_index") and k not in converted:
+                    converted[k] = v
+            specialist.load_state_dict(converted, strict=True)
             self.specialists[str(group_id)] = specialist
 
     def preprocess_swin(self, images):
