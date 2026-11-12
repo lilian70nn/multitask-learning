@@ -11,6 +11,7 @@ import timm
 from torch.serialization import safe_globals
 from torch.torch_version import TorchVersion
 
+from classification_vit.hierarchical import HierarchicalClassifier
 from classification_vit.train_classification import ViTClassifier
 from segmentation_vit.train_segmentation import ViTUNet
 
@@ -289,7 +290,6 @@ def load_checkpoint(path, key=None):
 def load_captioning_model(args):
     vision_encoder = timm.create_model("vit_base_patch16_224", pretrained=False, num_classes=0,)
     vision_state = load_checkpoint(args.vit_ckpt, key="ema_backbone")
-
     vision_encoder.load_state_dict(vision_state, strict=True)
 
     cls_model, seg_model, cls_classes, seg_classes = None, None, None, None
@@ -298,11 +298,9 @@ def load_captioning_model(args):
         if not args.cls_ckpt or not args.seg_ckpt:
             raise ValueError("Baseline 2/3 requires --cls_ckpt and --seg_ckpt.")
 
-        cls_state = load_checkpoint(args.cls_ckpt)
-        cls_classes = cls_state["head.weight"].shape[0]
-        cls_backbone = timm.create_model("vit_base_patch16_224", pretrained=False, num_classes=0,)
-        cls_model = ViTClassifier(cls_backbone, cls_classes)
-        cls_model.load_state_dict(cls_state, strict=True)
+
+        cls_model = HierarchicalClassifier(args.cls_ckpt, edl=(args.baseline == 3),)
+        cls_classes = cls_model.num_classes
 
         seg_state = load_checkpoint(args.seg_ckpt)
         seg_classes = seg_state["decoder.5.weight"].shape[0]

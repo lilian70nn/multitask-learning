@@ -4,6 +4,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from tqdm.auto import tqdm
 from transformers import AutoImageProcessor, AutoModelForImageClassification
@@ -193,3 +195,102 @@ def train_hierarchical_classifier(model, train_loader, val_loader, label_to_idx,
     print(f"Final Hierarchical | Acc: {hierarchical_metrics['accuracy']:.4f} | Macro-F1: {hierarchical_metrics['macro_f1']:.4f}")
     print(f"Results saved to: {save_dir}")
     return final_metrics
+
+
+
+class HierarchicalClassifier(nn.Module):
+    def __init__(self, ckpt_dir, edl=False):
+        super().__init__()
+        ckpt_dir = Path(ckpt_dir)
+        self.edl = edl
+
+        with open(ckpt_dir / "groups.json") as f:
+            info = json.load(f)
+
+        self.num_classes = len(info["original_classes"])
+        self.coarse_to_leaf = {int(k): int(v)for k, v in info["coarse_to_leaf"].items()}
+        self.group_to_coarse = {int(k): int(v) for k, v in info["group_to_coarse"].items()}
+        self.merge_groups = {int(group["group_id"]): group["class_indices"] for group in info["merge_groups"]}
+
+        # Stage 1: load trained Coarse ViT
+        self.coarse = initialize_vit_classifier(num_classes=info["num_coarse_classes"], ckpt_path=None)
+        self.coarse.load_state_dict(
+            torch.load(ckpt_dir / "coarse_best_model.pt", map_location="cpu", weights_only=True),
+            strict=True,
+        )
+
+        # Stage 2: load trained Swin Specialists
+        self.processor = AutoImageProcessor.from_pretrained(SWIN_NAME)
+        self.specialists = nn.ModuleDict()
+
+        for group_id, classes in self.merge_groups.items():
+            specialist = AutoModelForImageClassification.from_pretrained(SWIN_NAME, num_labels=len(classes), ignore_mismatched_sizes=True)
+            specialist.load_state_dict(
+                torch.load(ckpt_dir / f"swin_group_{group_id}_best_model.pt", map_location="cpu", weights_only=True,),
+                strict=True,
+            )
+            self.specialists[str(group_id)] = specialist
+
+    def preprocess_swin(self, images):
+        # Reverse Captioner's ImageNet normalization.
+        mean = images.new_tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+        std = images.new_tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
+        rgb = (images * std + mean).clamp(0, 1)
+
+        size = self.processor.size
+        if "shortest_edge" in size:
+            shortest = size["shortest_edge"]
+            h, w = rgb.shape[-2:]
+            scale = shortest / min(h, w)
+            new_h = round(h * scale)
+            new_w = round(w * scale)
+        else:
+            new_h = size["height"]
+            new_w = size["width"]
+
+        rgb = F.interpolate(rgb, size=(new_h, new_w), mode="bicubic", align_corners=False).clamp(0, 1)
+        if self.processor.do_center_crop:
+            crop_h = self.processor.crop_size["height"]
+            crop_w = self.processor.crop_size["width"]
+            top = (new_h - crop_h) // 2
+            left = (new_w - crop_w) // 2
+            rgb = rgb[:, :, top:top + crop_h, left:left + crop_w]
+
+        swin_mean = images.new_tensor(self.processor.image_mean).view(1, 3, 1, 1)
+        swin_std = images.new_tensor(self.processor.image_std).view(1, 3, 1, 1)
+
+        return (rgb - swin_mean) / swin_std
+
+    @torch.no_grad()
+    def forward(self, images):
+        # Stage 1
+        coarse_logits = self.coarse(images)
+
+        if self.edl:
+            coarse_alpha = F.softplus(coarse_logits) + 1
+            coarse_probs = coarse_alpha / coarse_alpha.sum(dim=1, keepdim=True)
+        else:
+            coarse_probs = F.softmax(coarse_logits, dim=1)
+
+        coarse_preds = coarse_probs.argmax(dim=1)
+        final_logits = torch.full((images.size(0), self.num_classes), -1e4, device=images.device, dtype=coarse_logits.dtype)
+        for coarse_idx, leaf_idx in self.coarse_to_leaf.items():
+            mask = coarse_preds == coarse_idx
+            final_logits[mask, leaf_idx] = coarse_logits[mask, coarse_idx]
+
+        swin_images = None
+        for group_id, classes in self.merge_groups.items():
+            coarse_idx = self.group_to_coarse[group_id]
+            indices = torch.where(coarse_preds == coarse_idx)[0]
+
+            if indices.numel() == 0:
+                continue
+
+            if swin_images is None:
+                swin_images = self.preprocess_swin(images)
+
+            logits = self.specialists[str(group_id)](pixel_values=swin_images[indices]).logits
+            class_indices = torch.tensor(classes, dtype=torch.long, device=images.device)
+            final_logits[indices[:, None], class_indices[None, :],] = logits
+
+        return final_logits
