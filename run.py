@@ -18,8 +18,8 @@ from caption.captioner_vit import load_captioning_model
 REPO_ID = "Lian70/model_weights"
 
 CLS_PATHS = {
-    "ce": "classification/vit_imagenet_dino_gastronet_ce/hierarchical",
-    "edl": "classification/vit_imagenet_dino_gastronet_edl/hierarchical",
+    "ce": "classification/vit_gastronet_dino_ce/hierarchical",
+    "edl": "classification/vit_gastronet_dino_edl/hierarchical",
 }
 
 SEG_PATHS = {
