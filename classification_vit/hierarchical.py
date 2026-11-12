@@ -249,7 +249,7 @@ class HierarchicalClassifier(nn.Module):
             new_w = size["width"]
 
         rgb = F.interpolate(rgb, size=(new_h, new_w), mode="bicubic", align_corners=False).clamp(0, 1)
-        if self.processor.do_center_crop:
+        if getattr(self.processor, "do_center_crop", False):
             crop_h = self.processor.crop_size["height"]
             crop_w = self.processor.crop_size["width"]
             top = (new_h - crop_h) // 2
