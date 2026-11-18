@@ -1,0 +1,122 @@
+"""Frozen-feature extraction with an on-disk cache.
+
+One code path for every backbone (all are ViTBackbone). Given a list of
+``(image_path, label)`` samples it returns ``{X: (N, 768), y: (N,)}`` and caches
+it under ``<cache>/<key>.npz`` where key hashes (backbone tag, img_size, sample
+paths + labels).
+
+Runs the forward pass through a PyTorch Lightning ``Trainer.predict()`` — same
+device/precision handling as SSL training (``vlfz/ssl/pretrain.py``), just a
+predict-only, one-batch-of-hooks LightningModule; no gradients, no checkpoints.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+
+import lightning.pytorch as pl
+import numpy as np
+
+
+def _key(backbone_tag: str, img_size: int, samples: list[tuple[str, int]]) -> str:
+    h = hashlib.sha1()
+    h.update(f"{backbone_tag}|{img_size}|{len(samples)}".encode())
+    for p, y in samples[:100000]:
+        h.update(f"{os.path.basename(p)}|{y}|".encode())
+    return h.hexdigest()[:16]
+
+
+class _PathDataset:
+    def __init__(self, samples, transform):
+        self.samples = samples
+        self.t = transform
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, i):
+        from PIL import Image
+
+        p, y = self.samples[i]
+        try:
+            img = Image.open(p).convert("RGB")
+        except Exception:
+            img = Image.new("RGB", (224, 224))
+        return self.t(img), int(y), i
+
+
+class _FeatModule(pl.LightningModule):
+    def __init__(self, backbone):
+        super().__init__()
+        self.backbone = backbone.eval()
+
+    def predict_step(self, batch, batch_idx):
+        xb, yb, idx = batch
+        f = self.backbone.feature(xb).float()
+        return f.cpu(), yb, idx
+
+
+@np.errstate(all="ignore")
+def extract_features(
+    backbone,
+    samples: list[tuple[str, int]],
+    cfg,
+    *,
+    backbone_tag: str,
+    cache_dir: str,
+    device: str | None = None,
+    recompute: bool = False,
+) -> dict:
+    import torch
+    from torch.utils.data import DataLoader
+
+    from ..data.transforms import eval_transform
+
+    os.makedirs(cache_dir, exist_ok=True)
+    key = _key(backbone_tag, int(cfg.eval.img_size), samples)
+    path = os.path.join(cache_dir, f"feat_{key}.npz")
+    if os.path.exists(path) and not recompute:
+        d = np.load(path)
+        return {"X": d["X"], "y": d["y"], "cache": path, "hit": True}
+
+    dev = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    dl = DataLoader(
+        _PathDataset(samples, eval_transform(cfg)),
+        batch_size=int(cfg.eval.batch_size),
+        num_workers=int(cfg.eval.num_workers),
+        pin_memory=(dev == "cuda"),
+        shuffle=False,
+    )
+    module = _FeatModule(backbone)
+    trainer = pl.Trainer(
+        accelerator=("gpu" if dev == "cuda" else "cpu"), devices=1,
+        precision=("bf16-mixed" if dev == "cuda" else 32),
+        logger=False, enable_checkpointing=False, enable_progress_bar=False,
+        enable_model_summary=False,
+    )
+    batches = trainer.predict(module, dataloaders=dl)
+
+    feats = np.empty((len(samples), backbone.embed_dim), dtype=np.float32)
+    ys = np.empty(len(samples), dtype=np.int64)
+    for f, yb, idx in batches:
+        idx = idx.numpy()
+        feats[idx] = f.numpy()
+        ys[idx] = yb.numpy()
+    feats = np.nan_to_num(feats, nan=0.0, posinf=0.0, neginf=0.0)
+    np.savez(path, X=feats, y=ys)
+    # sidecar so storage_report / anyone can attribute this .npz to its task.
+    # backbone_tag is "<tag>|<dataset>|<task>|<split>" (run_eval builds it).
+    try:
+        parts = backbone_tag.split("|")
+        json.dump({"tag": parts[0],
+                   "dataset": parts[1] if len(parts) > 1 else "",
+                   "task": parts[2] if len(parts) > 2 else "",
+                   "split": parts[3] if len(parts) > 3 else "",
+                   "n": int(len(samples)), "dim": int(backbone.embed_dim),
+                   "bytes": int(os.path.getsize(path)),
+                   "img_size": int(cfg.eval.img_size)},
+                  open(path[:-4] + ".json", "w"))
+    except Exception:  # noqa: BLE001
+        pass
+    return {"X": feats, "y": ys, "cache": path, "hit": False}

@@ -1,0 +1,44 @@
+# venv
+.venv/
+# python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+# run artefacts (kept on scratch $OUT_ROOT, never in the repo)
+/runs/
+/runs_smoke/
+/runs_*/
+/results/
+/outputs/
+/data/
+*.npz
+*.pt
+*.ckpt
+# slurm logs
+lrz/logs/
+slurm-*.out
+*.out
+*.err
+# local scratch
+.DS_Store
+# cloud pipeline: never commit state or secrets
+pipeline/infra/.terraform/
+pipeline/infra/.terraform.lock.hcl
+pipeline/infra/.build/
+*.tfstate
+*.tfstate.*
+*.tfvars
+tf.plan
+.aws/
+*accessKeys*
+*_accessKeys.csv
+pipeline/**/secrets*
+pipeline/**/portal.json
+pipeline/**/urls.txt
+shard_list.txt
+.gastronet_bucket
+
+# W&B (key is in ~/.wandb_key, never here)
+.wandb_key
+wandb/
