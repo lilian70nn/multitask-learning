@@ -10,7 +10,7 @@ import torch.nn as nn
 import timm
 from torch.serialization import safe_globals
 from torch.torch_version import TorchVersion
-from segmentation_vit.hyperkvasir_dataloader import initialize_segmentation_dataloaders
+from segmentation_vit.segmentation_dataloader import initialize_segmentation_dataloaders
 
 
 class ConvBlock(nn.Module):
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     torch.manual_seed(42)
 
     train_loader, val_loader = initialize_segmentation_dataloaders(
-        #data_dir="/content/colonbench_segmentation_test",
+        data_dir="/content/colonbench_segmentation",
         batch_size=args.batch_size,
     )
     model = initialize_vit_unet(num_classes=2, ckpt_path=args.ckpt)
