@@ -1,6 +1,7 @@
 from pathlib import Path
 from collections import Counter
 from PIL import Image
+import json
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
@@ -26,6 +27,7 @@ def initialize_classification_dataloaders(
     image_size=224,
     num_workers=2,
     seed=42,
+    save_dir=None,
 ):
     data_dir = Path(data_dir)
 
@@ -52,6 +54,22 @@ def initialize_classification_dataloaders(
         random_state=seed,
         stratify=labels,
     )
+
+    split_file = Path(save_dir) / "dataset_split.json"
+    split_info = {
+        "label_to_idx": label_to_idx,
+        "train": [
+            [path.relative_to(data_dir).as_posix(), int(label)]
+            for path, label in train_samples
+        ],
+        "val": [
+            [path.relative_to(data_dir).as_posix(), int(label)]
+            for path, label in val_samples
+        ],
+    }
+
+    with split_file.open("x", encoding="utf-8") as f:
+        json.dump(split_info, f, ensure_ascii=False, indent=2)
 
     train_transform = transforms.Compose([
         transforms.Resize((image_size, image_size)),
