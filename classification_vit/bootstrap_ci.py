@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 import numpy as np
+import json
 import torch
 from tqdm.auto import tqdm
 from sklearn.metrics import precision_recall_fscore_support
@@ -87,15 +88,12 @@ def bootstrap_ci(targets, preds, class_names, n_bootstrap=1000, confidence=0.95,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", type=str, default="/content/labeled-images")
-    parser.add_argument("--ce_dir", type=str, default=None)
-    parser.add_argument("--edl_dir", type=str, default=None)
+    parser.add_argument("--ckpt_dir", type=str, required=True)
+    parser.add_argument("--edl", action="store_true")
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--n_bootstrap", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
-
-    if not args.ce_dir and not args.edl_dir:
-        parser.error("Please provide --ce_dir and/or --edl_dir")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -106,48 +104,37 @@ def main():
     class_names = [name for name, _ in sorted(label_to_idx.items(), key=lambda x: x[1])]
     num_classes = len(class_names)
 
-    for model_name, ckpt_dir, edl in [("CE", args.ce_dir, False), ("EDL", args.edl_dir, True)]:
-        if ckpt_dir is None:
-            continue
+    ckpt_dir = Path(args.ckpt_dir)
 
-        save_dir = Path(ckpt_dir).parent / "bootstrap"
-        save_dir.mkdir(parents=True, exist_ok=True)
+    with open(ckpt_dir / "groups.json") as f:
+        groups_info = json.load(f)
 
-        model = HierarchicalClassifier(ckpt_dir=ckpt_dir, edl=edl).to(device).eval()
-        if model.num_classes != num_classes:
-            raise ValueError(f"{model_name}: model has {model.num_classes} classes, dataset has {num_classes}")
+    model_class_names = [groups_info["original_classes"][str(i)] for i in range(num_classes)]
+    if model_class_names != class_names:
+        raise ValueError("Class mapping does not match the trained model.")
 
-        targets, preds = collect_predictions(model, val_loader, device)
-        prediction_rows = [
-            {
-                "image_path": str(val_loader.dataset.samples[i][0]),
-                "true_label": class_names[int(targets[i])],
-                "pred_label": class_names[int(preds[i])],
-                "correct": int(targets[i] == preds[i]),
-            }
-            for i in range(len(targets))
-        ]
-        save_csv(save_dir / "predictions.csv", prediction_rows)
+    save_dir = ckpt_dir.parent / "bootstrap"
+    save_dir.mkdir(parents=True, exist_ok=True)
 
-        per_class, overall = bootstrap_ci(
-            targets, preds, class_names, n_bootstrap=args.n_bootstrap, seed=args.seed
-        )
+    model = HierarchicalClassifier(ckpt_dir=ckpt_dir, edl=args.edl).to(device).eval()
+    targets, preds = collect_predictions(model, val_loader, device)
 
-        save_csv(save_dir / "per_class_ci.csv", per_class)
-        save_csv(save_dir / "overall_ci.csv", overall)
-        print(f"\nAll results saved to: {save_dir}")
+    prediction_rows = [
+        {
+            "image_path": str(val_loader.dataset.samples[i][0]),
+            "true_label": class_names[int(targets[i])],
+            "pred_label": class_names[int(preds[i])],
+            "correct": int(targets[i] == preds[i]),
+        }
+        for i in range(len(targets))
+    ]
+    save_csv(save_dir / "predictions.csv", prediction_rows)
 
-        print(f"\n{model_name} Hierarchical Validation Results (95% Bootstrap CI):")
-        for row in overall:
-            print(f"{row['metric']}: {row['value']:.4f} [{row['ci_lower']:.4f}, {row['ci_upper']:.4f}]")
+    per_class, overall = bootstrap_ci(targets, preds, class_names, n_bootstrap=args.n_bootstrap, seed=args.seed)
+    save_csv(save_dir / "per_class_ci.csv", per_class)
+    save_csv(save_dir / "overall_ci.csv", overall)
 
-        print("\nPer-class F1:")
-        for row in per_class:
-            print(f"{row['class']}: {row['f1']:.4f} [{row['f1_ci_lower']:.4f}, {row['f1_ci_upper']:.4f}]")
-
-        del model
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+    print(f"Results saved to: {save_dir}")
 
     
 if __name__ == "__main__":
