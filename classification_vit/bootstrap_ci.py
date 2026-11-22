@@ -5,7 +5,9 @@ import json
 import torch
 from tqdm.auto import tqdm
 from sklearn.metrics import precision_recall_fscore_support
-from classification_vit.classification_dataloader import initialize_classification_dataloaders
+from classification_vit.classification_dataloader import FindingDataset
+from torch.utils.data import DataLoader
+from torchvision import transforms
 from classification_vit.hierarchical import HierarchicalClassifier
 from classification_vit.hierarchical_utils import calculate_metrics, save_csv
 
@@ -88,6 +90,7 @@ def bootstrap_ci(targets, preds, class_names, n_bootstrap=1000, confidence=0.95,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", type=str, default="/content/labeled-images")
+    parser.add_argument("--split_file", type=str, required=True)
     parser.add_argument("--ckpt_dir", type=str, required=True)
     parser.add_argument("--edl", action="store_true")
     parser.add_argument("--batch_size", type=int, default=32)
@@ -97,8 +100,31 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    _, val_loader, label_to_idx = initialize_classification_dataloaders(
-        data_dir=args.data_dir, batch_size=args.batch_size, seed=args.seed
+    with open(args.split_file, encoding="utf-8") as f:
+        split_info = json.load(f)
+
+    label_to_idx = split_info["label_to_idx"]
+
+    val_samples = [
+        (Path(args.data_dir) / relative_path, int(label))
+        for relative_path, label in split_info["val"]
+    ]
+
+    val_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225],
+        ),
+    ])
+
+    val_loader = DataLoader(
+        FindingDataset(val_samples, val_transform),
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=2,
+        pin_memory=True,
     )
 
     class_names = [name for name, _ in sorted(label_to_idx.items(), key=lambda x: x[1])]
