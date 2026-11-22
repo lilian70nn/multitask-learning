@@ -60,7 +60,7 @@ def bootstrap_ci(targets, preds, class_names, n_bootstrap=1000, confidence=0.95,
     for i, name in enumerate(class_names):
         row = {"class": name, "support": int(report[name]["support"])}
 
-        for j, metric in enumerate(["precision", "recall", "f1"]):
+        for j, metric in enumerate(["precision", "recall", "f1-score"]):
             values = per_class_scores[:, i, j]
             values = values[~np.isnan(values)]
             if len(values) == 0:
