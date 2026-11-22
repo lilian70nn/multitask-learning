@@ -132,7 +132,10 @@ class GastroNet:
                     "class_index": index,
                     "class_name": self.class_names[index],
                     "confidence": float(probs[0, index].item()),
-                    "probabilities": probs[0].cpu().tolist(),
+                    "class_scores": {
+                        self.class_names[i]: float(score)
+                        for i, score in enumerate(probs[0].cpu().tolist())
+                    },
                 }
 
             if self.task == "segmentation":
