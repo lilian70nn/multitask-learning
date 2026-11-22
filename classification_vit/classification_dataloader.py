@@ -56,6 +56,7 @@ def initialize_classification_dataloaders(
     )
 
     split_file = Path(save_dir) / "dataset_split.json"
+    split_file.parent.mkdir(parents=True, exist_ok=True)
     split_info = {
         "label_to_idx": label_to_idx,
         "train": [
