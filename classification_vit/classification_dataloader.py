@@ -69,7 +69,7 @@ def initialize_classification_dataloaders(
         ],
     }
 
-    with split_file.open("x", encoding="utf-8") as f:
+    with split_file.open("w", encoding="utf-8") as f:
         json.dump(split_info, f, ensure_ascii=False, indent=2)
 
     train_transform = transforms.Compose([
