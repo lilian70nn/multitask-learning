@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from classification_vit.hierarchical import HierarchicalClassifier
 from classification_vit.hierarchical_utils import calculate_metrics, save_csv
+from classification_vit.hierarchical_utils import evaluate_hierarchical
 
 
 @torch.inference_mode()
@@ -143,7 +144,41 @@ def main():
     save_dir.mkdir(parents=True, exist_ok=True)
 
     model = HierarchicalClassifier(ckpt_dir=ckpt_dir, edl=args.edl).to(device).eval()
-    targets, preds = collect_predictions(model, val_loader, device)
+
+    # 按相同顺序组织专家及其类别组
+    group_ids = sorted(model.merge_groups)
+
+    specialists = [model.specialists[str(group_id)] for group_id in group_ids]
+    merge_groups = [model.merge_groups[group_id] for group_id in group_ids]
+    group_to_coarse = {index: model.group_to_coarse[group_id] for index, group_id in enumerate(group_ids)}
+
+    (
+        final_metrics,
+        final_cm,
+        targets,
+        preds,
+        coarse_preds,
+        coarse_metrics,
+        coarse_cm,
+    ) = evaluate_hierarchical(
+        coarse_model=model.coarse,
+        specialists=specialists,
+        val_loader=val_loader,
+        val_samples=val_samples,
+        processor=model.processor,
+        coarse_to_leaf=model.coarse_to_leaf,
+        group_to_coarse=group_to_coarse,
+        merge_groups=merge_groups,
+        num_classes=num_classes,
+        edl=args.edl,
+        batch_size=args.batch_size,
+    )
+
+    print(
+        f"Final Hierarchical | "
+        f"Acc: {final_metrics['accuracy']:.4f} | "
+        f"Macro-F1: {final_metrics['macro_f1']:.4f}"
+    )
 
     prediction_rows = [
         {
