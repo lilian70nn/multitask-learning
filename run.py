@@ -12,7 +12,7 @@ from huggingface_hub import snapshot_download
 
 from classification_vit.hierarchical import HierarchicalClassifier
 from segmentation_vit.train_segmentation import ViTUNet
-from caption.captioner_vit import load_captioning_model
+from captioning.captioner_vit import load_captioning_model
 
 
 REPO_ID = "Lian70/model_weights"
