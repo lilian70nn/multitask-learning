@@ -32,6 +32,19 @@ def save_csv(path, rows):
         writer.writerows(rows)
 
 
+def specificity_from_cm(cm):
+    negatives = cm.sum() - cm.sum(axis=1)
+    false_positives = cm.sum(axis=0) - np.diag(cm)
+    true_negatives = negatives - false_positives
+
+    return np.divide(
+        true_negatives,
+        negatives,
+        out=np.full(len(cm), np.nan),
+        where=negatives > 0,
+    )
+
+
 def calculate_metrics(targets, preds, num_classes, uncertainties=None, class_names=None):
     labels = list(range(num_classes))
 
@@ -71,6 +84,10 @@ def calculate_metrics(targets, preds, num_classes, uncertainties=None, class_nam
     }
 
     cm = confusion_matrix(targets, preds, labels=labels)
+    specificity = specificity_from_cm(cm)
+    metrics["macro_sensitivity"] = metrics["macro_recall"]
+    metrics["macro_specificity"] = float(np.nanmean(specificity))
+    metrics["per_class_specificity"] = specificity.tolist()
 
     return metrics, cm
 

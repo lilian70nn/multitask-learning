@@ -9,8 +9,12 @@ from classification_vit.classification_dataloader import FindingDataset
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from classification_vit.hierarchical import HierarchicalClassifier
-from classification_vit.hierarchical_utils import calculate_metrics, save_csv
-from classification_vit.hierarchical_utils import evaluate_hierarchical
+from classification_vit.hierarchical_utils import (
+    calculate_metrics,
+    evaluate_hierarchical,
+    save_csv,
+    specificity_from_cm,
+)
 
 
 @torch.inference_mode()
@@ -24,19 +28,6 @@ def collect_predictions(model, loader, device):
     return targets, preds
 
 
-def specificity_from_cm(cm):
-    negatives = cm.sum() - cm.sum(axis=1)
-    false_positives = cm.sum(axis=0) - np.diag(cm)
-    true_negatives = negatives - false_positives
-
-    return np.divide(
-        true_negatives,
-        negatives,
-        out=np.full(len(cm), np.nan),
-        where=negatives > 0,
-    )
-
-
 def bootstrap_ci(
     targets, preds, class_names, n_bootstrap=1000, confidence=0.95, seed=42
 ):
@@ -46,18 +37,14 @@ def bootstrap_ci(
     rng = np.random.default_rng(seed)
     alpha = (1 - confidence) / 2
 
-    original, cm = calculate_metrics(
-        targets, preds, num_classes, class_names=class_names
-    )
+    original, _ = calculate_metrics(targets, preds, num_classes, class_names=class_names)
     report = original["classification_report"]
-    specificity = specificity_from_cm(cm)
-    original["macro_sensitivity"] = original["macro_recall"]
-    original["macro_specificity"] = float(np.nanmean(specificity))
+    specificity = original["per_class_specificity"]
 
-    per_class_names = ["precision", "sensitivity", "f1-score", "specificity"]
+    per_class_names = ["precision", "sensitivity", "specificity", "f1-score"]
     overall_names = [
         "accuracy", "macro_precision", "macro_sensitivity",
-        "macro_f1", "weighted_f1", "macro_specificity",
+        "macro_specificity", "macro_f1", "weighted_f1",
     ]
     per_class_scores = np.full((n_bootstrap, num_classes, 4), np.nan)
     overall_scores = np.full((n_bootstrap, len(overall_names)), np.nan)
@@ -66,24 +53,21 @@ def bootstrap_ci(
         indices = rng.choice(n, size=n, replace=True)
         y_true, y_pred = targets[indices], preds[indices]
 
-        precision, recall, f1, support = precision_recall_fscore_support(
-            y_true, y_pred, labels=labels, average=None, zero_division=0
-        )
-        draw_specificity = specificity_from_cm(
-            confusion_matrix(y_true, y_pred, labels=labels)
-        )
+        precision, recall, f1, support = precision_recall_fscore_support(y_true, y_pred, labels=labels, average=None, zero_division=0)
+        draw_specificity = specificity_from_cm(confusion_matrix(y_true, y_pred, labels=labels))
 
-        per_class_scores[b, :, :3] = np.column_stack((precision, recall, f1))
-        per_class_scores[b, support == 0, :3] = np.nan
-        per_class_scores[b, :, 3] = draw_specificity
+        per_class_scores[b] = np.column_stack((precision, recall, draw_specificity, f1))
+        per_class_scores[b, support == 0, 0] = np.nan
+        per_class_scores[b, support == 0, 1] = np.nan
+        per_class_scores[b, support == 0, 3] = np.nan
 
         overall_scores[b] = [
             np.mean(y_true == y_pred),
             precision.mean(),
             recall.mean(),
+            np.nanmean(draw_specificity),
             f1.mean(),
             np.average(f1, weights=support),
-            np.nanmean(draw_specificity),
         ]
 
     def interval(values):
@@ -97,7 +81,7 @@ def bootstrap_ci(
     for i, name in enumerate(class_names):
         stats = report[name]
         point_estimates = [
-            stats["precision"], stats["recall"], stats["f1-score"], specificity[i]
+            stats["precision"], stats["recall"], specificity[i], stats["f1-score"],
         ]
         row = {"class": name, "support": int(stats["support"])}
         for j, metric in enumerate(per_class_names):
@@ -181,7 +165,6 @@ def main():
 
     model = HierarchicalClassifier(ckpt_dir=ckpt_dir, edl=args.edl).to(device).eval()
 
-    # 按相同顺序组织专家及其类别组
     group_ids = sorted(model.merge_groups)
 
     specialists = [model.specialists[str(group_id)] for group_id in group_ids]
