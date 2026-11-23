@@ -4,7 +4,7 @@ import numpy as np
 import json
 import torch
 from tqdm.auto import tqdm
-from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
 from classification_vit.classification_dataloader import FindingDataset
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -24,17 +24,43 @@ def collect_predictions(model, loader, device):
     return targets, preds
 
 
-def bootstrap_ci(targets, preds, class_names, n_bootstrap=1000, confidence=0.95, seed=42):
+def specificity_from_cm(cm):
+    negatives = cm.sum() - cm.sum(axis=1)
+    false_positives = cm.sum(axis=0) - np.diag(cm)
+    true_negatives = negatives - false_positives
+
+    return np.divide(
+        true_negatives,
+        negatives,
+        out=np.full(len(cm), np.nan),
+        where=negatives > 0,
+    )
+
+
+def bootstrap_ci(
+    targets, preds, class_names, n_bootstrap=1000, confidence=0.95, seed=42
+):
     targets, preds = np.asarray(targets), np.asarray(preds)
     num_classes, n = len(class_names), len(targets)
     labels = np.arange(num_classes)
     rng = np.random.default_rng(seed)
-    original, _ = calculate_metrics(targets, preds, num_classes, class_names=class_names)
-    report = original["classification_report"]
+    alpha = (1 - confidence) / 2
 
-    per_class_scores = np.full((n_bootstrap, num_classes, 3), np.nan)
-    overall_names = ["accuracy", "macro_precision", "macro_recall", "macro_f1", "weighted_f1"]
-    overall_scores = np.zeros((n_bootstrap, len(overall_names)))
+    original, cm = calculate_metrics(
+        targets, preds, num_classes, class_names=class_names
+    )
+    report = original["classification_report"]
+    specificity = specificity_from_cm(cm)
+    original["macro_sensitivity"] = original["macro_recall"]
+    original["macro_specificity"] = float(np.nanmean(specificity))
+
+    per_class_names = ["precision", "sensitivity", "f1-score", "specificity"]
+    overall_names = [
+        "accuracy", "macro_precision", "macro_sensitivity",
+        "macro_f1", "weighted_f1", "macro_specificity",
+    ]
+    per_class_scores = np.full((n_bootstrap, num_classes, 4), np.nan)
+    overall_scores = np.full((n_bootstrap, len(overall_names)), np.nan)
 
     for b in tqdm(range(n_bootstrap), desc="Bootstrap"):
         indices = rng.choice(n, size=n, replace=True)
@@ -43,11 +69,13 @@ def bootstrap_ci(targets, preds, class_names, n_bootstrap=1000, confidence=0.95,
         precision, recall, f1, support = precision_recall_fscore_support(
             y_true, y_pred, labels=labels, average=None, zero_division=0
         )
+        draw_specificity = specificity_from_cm(
+            confusion_matrix(y_true, y_pred, labels=labels)
+        )
 
-        per_class_scores[b, :, 0] = precision
-        per_class_scores[b, :, 1] = recall
-        per_class_scores[b, :, 2] = f1
-        per_class_scores[b, support == 0, :] = np.nan
+        per_class_scores[b, :, :3] = np.column_stack((precision, recall, f1))
+        per_class_scores[b, support == 0, :3] = np.nan
+        per_class_scores[b, :, 3] = draw_specificity
 
         overall_scores[b] = [
             np.mean(y_true == y_pred),
@@ -55,34 +83,42 @@ def bootstrap_ci(targets, preds, class_names, n_bootstrap=1000, confidence=0.95,
             recall.mean(),
             f1.mean(),
             np.average(f1, weights=support),
+            np.nanmean(draw_specificity),
         ]
 
-    alpha = (1 - confidence) / 2
+    def interval(values):
+        values = values[np.isfinite(values)]
+        if values.size == 0:
+            return np.nan, np.nan
+        lower, upper = np.quantile(values, [alpha, 1 - alpha])
+        return float(lower), float(upper)
+
     per_class_rows = []
-
     for i, name in enumerate(class_names):
-        row = {"class": name, "support": int(report[name]["support"])}
+        stats = report[name]
+        point_estimates = [
+            stats["precision"], stats["recall"], stats["f1-score"], specificity[i]
+        ]
+        row = {"class": name, "support": int(stats["support"])}
+        for j, metric in enumerate(per_class_names):
+            lower, upper = interval(per_class_scores[:, i, j])
+            row[metric] = float(point_estimates[j])
+            row[f"{metric}_ci_lower"] = lower
+            row[f"{metric}_ci_upper"] = upper
 
-        for j, metric in enumerate(["precision", "recall", "f1-score"]):
-            values = per_class_scores[:, i, j]
-            values = values[~np.isnan(values)]
-            if len(values) == 0:
-                raise ValueError(f"No valid bootstrap samples for class {name}")
-
-            row[metric] = float(report[name][metric])
-            row[f"{metric}_ci_lower"] = float(np.quantile(values, alpha))
-            row[f"{metric}_ci_upper"] = float(np.quantile(values, 1 - alpha))
-
-        row["valid_bootstrap_draws"] = int(np.sum(~np.isnan(per_class_scores[:, i, 0])))
+        row["valid_bootstrap_draws"] = int(
+            np.isfinite(per_class_scores[:, i, 0]).sum()
+        )
         per_class_rows.append(row)
 
     overall_rows = []
     for j, metric in enumerate(overall_names):
+        lower, upper = interval(overall_scores[:, j])
         overall_rows.append({
             "metric": metric,
             "value": float(original[metric]),
-            "ci_lower": float(np.quantile(overall_scores[:, j], alpha)),
-            "ci_upper": float(np.quantile(overall_scores[:, j], 1 - alpha)),
+            "ci_lower": lower,
+            "ci_upper": upper,
         })
 
     return per_class_rows, overall_rows
