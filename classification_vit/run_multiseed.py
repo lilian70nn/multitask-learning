@@ -264,11 +264,10 @@ def main():
         predictions.insert(0, "method", args.method)
         prediction_frames.append(predictions)
         write_csv(pd.concat(prediction_frames, ignore_index=True), out / "predictions.csv")
-
-        summary = results[METRICS + ["mean_leaf_entropy"]].agg(["mean", "std"]).T
-        write_csv(summary.rename_axis("metric").reset_index(), out / "results_mean_sd.csv")
-
         print(f"Seed {seed} | Val accuracy: {scores['accuracy']:.4f} | Val Macro-F1: {scores['macro_f1']:.4f}", flush=True)
+
+    summary = results[METRICS + ["mean_leaf_entropy"]].agg(["mean", "std"]).T
+    write_csv(summary.rename_axis("metric").reset_index(), out / "results_mean_sd.csv")
 
     print(f"Saved to {out}")
 
