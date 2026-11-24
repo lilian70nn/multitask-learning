@@ -158,7 +158,11 @@ def evaluate_and_record(coarse, specialists, vit_loader, swin_loader, val, names
     if len(rows) != len(val):
         raise ValueError("Validation prediction count does not match the saved split.")
 
-    return pd.DataFrame(rows)
+    predictions = pd.DataFrame(rows)
+    metrics, _ = calculate_metrics(all_targets, all_preds, len(names), class_names=names)
+    scores = {key: float(metrics[key]) for key in METRICS}
+    scores["mean_leaf_entropy"] = float(predictions["entropy"].mean())
+    return predictions, scores
 
 
 def run_one(args, seed, inputs):
@@ -242,43 +246,30 @@ def main():
 
     inputs = load_inputs(args)
     seeds = sample_seeds(args.runs)
-    print(f"Method: {args.method.upper()} | Runs: {args.runs} | Seeds: {seeds}", flush=True)
-
     out = args.output_dir
     out.mkdir(parents=True, exist_ok=True)
-    prediction_file = out / "predictions.csv"
-    names, _, _, _, val = inputs
 
-    settings = {"groups": file_digest(args.groups_file), "split": file_digest(args.split_file),
-                "ckpt": str(args.ckpt.resolve()), "data_dir": str(args.data_dir.resolve()),
-                "epochs": args.epochs, "batch_size": args.batch_size, "workers": args.workers}
-    settings_id = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
+    prediction_frames = []
+    metric_rows = []
+    print(f"Method: {args.method.upper()} | Seeds: {seeds}", flush=True)
 
-    if prediction_file.exists():
-        predictions = pd.read_csv(prediction_file)
-        if set(predictions["settings_id"]) != {settings_id}:
-            raise ValueError("已有结果使用了不同的实验设置，请指定新的 --output_dir。")
-    else:
-        predictions = pd.DataFrame()
-
-    completed = set(predictions["seed"]) if not predictions.empty else set()
     for seed in seeds:
-        if seed in completed:
-            print(f"Skipping completed seed {seed}", flush=True)
-            continue
+        predictions, scores = run_one(args, seed, inputs)
 
-        new_rows = run_one(args, seed, inputs)
-        if len(new_rows) != len(val):
-            raise RuntimeError(f"Incomplete validation predictions for seed {seed}")
+        metric_rows.append({"method": args.method, "seed": seed, **scores})
+        results = pd.DataFrame(metric_rows)
+        write_csv(results, out / "results_by_seed.csv")
 
-        new_rows.insert(0, "seed", seed)
-        new_rows.insert(0, "method", args.method)
-        new_rows["settings_id"] = settings_id
-        predictions = pd.concat([predictions, new_rows], ignore_index=True)
-        write_csv(predictions, prediction_file)
+        predictions.insert(0, "seed", seed)
+        predictions.insert(0, "method", args.method)
+        prediction_frames.append(predictions)
+        write_csv(pd.concat(prediction_frames, ignore_index=True), out / "predictions.csv")
 
-        selected = predictions[predictions["seed"].isin(seeds)]
-        summarize(selected, names, out)
+        summary = results[METRICS + ["mean_leaf_entropy"]].agg(["mean", "std"]).T
+        write_csv(summary.rename_axis("metric").reset_index(), out / "results_mean_sd.csv")
+
+        print(f"Seed {seed} | Val accuracy: {scores['accuracy']:.4f} | Val Macro-F1: {scores['macro_f1']:.4f}", flush=True)
+
     print(f"Saved to {out}")
 
 
