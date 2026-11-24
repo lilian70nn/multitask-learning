@@ -277,8 +277,8 @@ def main():
         predictions = pd.concat([predictions, new_rows], ignore_index=True)
         write_csv(predictions, prediction_file)
 
-    selected = predictions[predictions["seed"].isin(seeds)]
-    summarize(selected, names, out)
+        selected = predictions[predictions["seed"].isin(seeds)]
+        summarize(selected, names, out)
     print(f"Saved to {out}")
 
 
