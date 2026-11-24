@@ -24,7 +24,7 @@ METRICS = ["accuracy", "macro_precision", "macro_sensitivity", "macro_specificit
 
 def sample_seeds(count):
     # Same sequence across CE and EDL, including when --runs increases later.
-    rng = random.Random(2026)
+    rng = random.Random(42)
     seeds, used = [], set()
     while len(seeds) < count:
         seed = rng.randrange(2**31)
