@@ -244,7 +244,7 @@ def main():
     seeds = sample_seeds(args.runs)
     print(f"Method: {args.method.upper()} | Runs: {args.runs} | Seeds: {seeds}", flush=True)
 
-    out = args.output_dir / args.method
+    out = args.output_dir
     out.mkdir(parents=True, exist_ok=True)
     prediction_file = out / "predictions.csv"
     names, _, _, _, val = inputs
