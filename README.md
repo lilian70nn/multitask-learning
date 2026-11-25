@@ -1,4 +1,4 @@
-# EndoVision AI — Web Interface (`ui` branch)
+# EndoVision AI 
 
 Interactive web workstation for GI endoscopy image and video analysis, lesion segmentation, evidential uncertainty estimation, clinical Q&A, and A4 PDF report export.
 
@@ -6,7 +6,7 @@ Interactive web workstation for GI endoscopy image and video analysis, lesion se
 
 * **GPU:** NVIDIA CUDA GPU with $\ge 24\text{ GB}$ VRAM (e.g., RTX A6000, L40S, A100)
 * **Python:** 3.10+
-* **Network:** Expose HTTP port **`7860`** (if running on RunPod or a remote server)
+* **Network:** Expose HTTP port **`7860`** (a remote server)
 
 ## Quick Start
 
