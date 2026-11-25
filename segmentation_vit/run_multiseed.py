@@ -48,7 +48,8 @@ def write_csv(frame, path):
 
 def load_or_create_split(args):
     root = args.data_dir
-    split_path = root / "dataset_split.json"
+    args.output_dir.parent.mkdir(parents=True, exist_ok=True)
+    split_path = args.output_dir.parent / "dataset_split.json"
     if split_path.is_file():
         split = json.loads(split_path.read_text())
         if split.get("dataset") != args.dataset:
