@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EndoVision AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #050914; color: #f8fafc; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090f1d; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-sky-500 selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function App() {
+      const [sessionId, setSessionId] = useState(null);
+      const [segDomain, setSegDomain] = useState("colonbench");
+      const [maskThresh, setMaskThresh] = useState(0.5);
+      const [sampleFps, setSampleFps] = useState(2);
+      const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+      const [viewMode, setViewMode] = useState("split");
+      const [sliderPos, setSliderPos] = useState(50);
+      const [rawImg, setRawImg] = useState(null);
+      const [overlayImg, setOverlayImg] = useState(null);
+      const [uncImg, setUncImg] = useState(null);
+      const [videoUrl, setVideoUrl] = useState(null);
+      const [keyframes, setKeyframes] = useState([]);
+      const [activeKf, setActiveKf] = useState(0);
+      const [metrics, setMetrics] = useState(null);
+      const [showTelemetry, setShowTelemetry] = useState(false);
+
+      const [chatHistory, setChatHistory] = useState([]);
+      const [chatInput, setChatInput] = useState("");
+      const [isStreaming, setIsStreaming] = useState(false);
+      const [reportText, setReportText] = useState("");
+      const [isReporting, setIsReporting] = useState(false);
+
+      const chatEndRef = useRef(null);
+
+      useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [chatHistory]);
+
+      const handleFileUpload = async (file) => {
+        if (!file) return;
+        setIsAnalyzing(true);
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("seg_domain", segDomain);
+          fd.append("mask_thresh", maskThresh);
+          fd.append("sample_fps", sampleFps);
+
+          const res = await fetch("/api/analyze", { method: "POST", body: fd });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+
+          setSessionId(data.session_id);
+          setRawImg(data.raw_image);
+          setOverlayImg(data.overlay_image);
+          setUncImg(data.uncertainty_image);
+          setVideoUrl(data.video_url);
+          setKeyframes(data.keyframes || []);
+          setMetrics(data.metrics);
+          setViewMode(data.video_url ? "video" : "split");
+
+          setChatHistory([{
+            role: "assistant",
+            content: `Analysis complete: ${data.metrics.finding} (${(data.metrics.confidence * 100).toFixed(1)}% confidence, uncertainty ${data.metrics.uncertainty.toFixed(3)}). "${data.metrics.caption}"`
+          }]);
+        } catch (err) {
+          alert("Analysis error: " + err.message);
+        } finally {
+          setIsAnalyzing(false);
+        }
+      };
+
+      const handleThresholdChange = async (val) => {
+        setMaskThresh(val);
+        if (!sessionId) return;
+        try {
+          const res = await fetch("/api/threshold", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sessionId, mask_thresh: val })
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          setOverlayImg(data.overlay_image);
+          setMetrics(prev => ({ ...prev, ...data.metrics }));
+        } catch (e) {}
+      };
+
+      const handleSelectKeyframe = async (idx) => {
+        setActiveKf(idx);
+        setViewMode("split");
+        if (!sessionId) return;
+        const res = await fetch("/api/threshold", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, mask_thresh: maskThresh, keyframe_idx: idx })
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setRawImg(data.raw_image);
+        setOverlayImg(data.overlay_image);
+        setUncImg(data.uncertainty_image);
+        setMetrics(prev => ({ ...prev, ...data.metrics }));
+      };
+
+      const sendChatMessage = async (msgText) => {
+        const text = (msgText ?? chatInput).trim();
+        if (!text || isStreaming) return;
+        const priorHistory = [...chatHistory];
+        setChatInput("");
+        setChatHistory([...priorHistory, { role: "user", content: text }, { role: "assistant", content: "" }]);
+        setIsStreaming(true);
+
+        try {
+          const res = await fetch("/api/chat/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: text,
+              history: priorHistory,
+              structured_context: metrics?.structured_context || ""
+            })
+          });
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let reply = "";
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop();
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              const parsed = JSON.parse(line);
+              reply += parsed.token;
+              setChatHistory([...priorHistory, { role: "user", content: text }, { role: "assistant", content: reply }]);
+            }
+          }
+        } catch (err) {
+          setChatHistory([...priorHistory, { role: "user", content: text }, { role: "assistant", content: "Error: " + err.message }]);
+        } finally {
+          setIsStreaming(false);
+        }
+      };
+
+      const handleGenerateReport = async () => {
+        if (!metrics?.structured_context) return alert("Upload and analyze a scan first.");
+        setIsReporting(true);
+        try {
+          const res = await fetch("/api/report", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: "",
+              history: chatHistory,
+              structured_context: metrics.structured_context
+            })
+          });
+          const data = await res.json();
+          setReportText(data.report);
+        } finally {
+          setIsReporting(false);
+        }
+      };
+
+      const handleExportPdf = async () => {
+        const res = await fetch("/api/export/pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            overlay_image: overlayImg,
+            uncertainty_image: uncImg,
+            structured_context: metrics?.structured_context || "",
+            report: reportText
+          })
+        });
+        const data = await res.json();
+        window.open(data.pdf_url, "_blank");
+      };
+
+      const uncBadge = (u) => {
+        if (u == null) return { label: "Standby", cls: "text-slate-400 bg-slate-800/60 border-slate-700" };
+        if (u < 0.35) return { label: "Low Uncertainty", cls: "text-emerald-400 bg-emerald-950/60 border-emerald-700/60" };
+        if (u < 0.55) return { label: "Moderate Uncertainty", cls: "text-amber-400 bg-amber-950/60 border-amber-700/60" };
+        return { label: "High Uncertainty", cls: "text-rose-400 bg-rose-950/60 border-rose-700/60" };
+      };
+
+      return (
+        <div className="flex-1 flex flex-col max-w-[1600px] w-full mx-auto px-5 py-4 gap-4">
+          {/* TOP HEADER BAR */}
+          <header className="bg-slate-900/90 border border-slate-800 rounded-2xl px-6 py-3.5 flex items-center justify-between shadow-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-teal-500 flex items-center justify-center font-bold text-lg shadow-lg shadow-sky-500/20">
+                EV
+              </div>
+              <h1 className="text-lg font-bold tracking-tight text-white">EndoVision AI</h1>
+            </div>
+          </header>
+
+          {/* SPLIT-PANE DIAGNOSTIC WORKSTATION */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1">
+            {/* LEFT PANE: IMAGING VIEWPORT */}
+            <div className="lg:col-span-6 bg-slate-900/75 border border-slate-800 rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Checkpoint:</span>
+                  {["colonbench", "polyp"].map(dom => (
+                    <button
+                      key={dom}
+                      onClick={() => setSegDomain(dom)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold border transition ${
+                        segDomain === dom
+                          ? "bg-sky-500/20 border-sky-500 text-sky-300"
+                          : "bg-slate-950 border-slate-800 text-slate-400"
+                      }`}
+                    >
+                      {dom}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                  <button
+                    onClick={() => setViewMode("split")}
+                    className={`px-2.5 py-1 rounded text-xs font-medium ${viewMode === "split" ? "bg-slate-800 text-white" : "text-slate-400"}`}
+                  >
+                    Before / After Wipe
+                  </button>
+                  <button
+                    onClick={() => setViewMode("uncertainty")}
+                    className={`px-2.5 py-1 rounded text-xs font-medium ${viewMode === "uncertainty" ? "bg-slate-800 text-white" : "text-slate-400"}`}
+                  >
+                    Uncertainty Map
+                  </button>
+                  {videoUrl && (
+                    <button
+                      onClick={() => setViewMode("video")}
+                      className={`px-2.5 py-1 rounded text-xs font-medium ${viewMode === "video" ? "bg-sky-600 text-white" : "text-slate-400"}`}
+                    >
+                      Video Stream
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="relative w-full aspect-square max-h-[440px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center mx-auto">
+                {isAnalyzing && (
+                  <div className="absolute inset-0 bg-slate-950/80 z-30 flex flex-col items-center justify-center gap-3">
+                    <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-xs font-medium text-sky-300">Running...</p>
+                  </div>
+                )}
+
+                {!rawImg && !videoUrl && (
+                  <label className="cursor-pointer flex flex-col items-center justify-center p-8 text-center hover:bg-slate-900/50 transition w-full h-full">
+                    <div className="w-14 h-14 rounded-2xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 mb-3 text-2xl">
+                      +
+                    </div>
+                    <p className="text-sm font-semibold text-slate-200">Drop Endoscopy Image or Video (.mp4 / .avi)</p>
+                    <p className="text-xs text-slate-400 mt-1">Click or drag a file to analyze</p>
+                    <input type="file" accept="image/*,video/*,.avi" className="hidden" onChange={e => handleFileUpload(e.target.files[0])} />
+                  </label>
+                )}
+
+                {rawImg && viewMode === "split" && (
+                  <div className="relative w-full h-full select-none">
+                    <img src={overlayImg} className="w-full h-full object-contain" alt="Overlay" />
+                    <div
+                      className="absolute inset-0 overflow-hidden"
+                      style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}
+                    >
+                      <img src={rawImg} className="w-full h-full object-contain" alt="Raw" />
+                    </div>
+                    <div
+                      className="absolute top-0 bottom-0 w-0.5 bg-sky-400 shadow-[0_0_10px_#38bdf8] pointer-events-none"
+                      style={{ left: `${sliderPos}%` }}
+                    >
+                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-slate-900 border-2 border-sky-400 flex items-center justify-center text-[10px] text-sky-300 font-bold">
+                        &#8596;
+                      </div>
+                    </div>
+                    <input
+                      type="range" min="0" max="100" value={sliderPos}
+                      onChange={e => setSliderPos(e.target.value)}
+                      className="absolute inset-0 opacity-0 cursor-ew-resize w-full h-full"
+                    />
+                    <span className="absolute top-3 left-3 bg-slate-950/80 text-[11px] px-2.5 py-1 rounded-md border border-slate-800 text-slate-300">Raw Mucosa</span>
+                    <span className="absolute top-3 right-3 bg-slate-950/80 text-[11px] px-2.5 py-1 rounded-md border border-teal-500/40 text-teal-300">Mask Overlay</span>
+                  </div>
+                )}
+
+                {uncImg && viewMode === "uncertainty" && (
+                  <div className="relative w-full h-full">
+                    <img src={uncImg} className="w-full h-full object-contain" alt="Uncertainty" />
+                    <span className="absolute top-3 left-3 bg-slate-950/80 text-[11px] px-2.5 py-1 rounded-md border border-amber-500/40 text-amber-300">
+                      Epistemic Uncertainty Heatmap
+                    </span>
+                  </div>
+                )}
+
+                {videoUrl && viewMode === "video" && (
+                  <video src={videoUrl} controls autoPlay loop className="w-full h-full object-contain" />
+                )}
+              </div>
+
+              <div className="bg-slate-950/90 border border-slate-800/90 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex-1 min-w-[200px]">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-slate-400 font-medium">Live Polyp Mask Threshold</span>
+                    <span className="mono text-sky-400 font-semibold">{Number(maskThresh).toFixed(2)}</span>
+                  </div>
+                  <input
+                    type="range" min="0.10" max="0.90" step="0.05" value={maskThresh}
+                    onChange={e => handleThresholdChange(parseFloat(e.target.value))}
+                    className="w-full accent-sky-500 cursor-pointer"
+                  />
+                </div>
+
+                <label className="cursor-pointer px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition">
+                  Upload New Scan
+                  <input type="file" accept="image/*,video/*,.avi" className="hidden" onChange={e => handleFileUpload(e.target.files[0])} />
+                </label>
+              </div>
+
+              {keyframes.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 mb-2">Detected Keyframes:</p>
+                  <div className="grid grid-cols-4 gap-2.5">
+                    {keyframes.map((kf, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSelectKeyframe(idx)}
+                        className={`p-1.5 rounded-xl border text-left transition ${
+                          activeKf === idx ? "border-sky-500 bg-sky-500/10" : "border-slate-800 bg-slate-950 hover:border-slate-700"
+                        }`}
+                      >
+                        <img src={kf.thumb} className="w-full h-16 object-cover rounded-lg mb-1" />
+                        <div className="text-[11px] font-semibold text-slate-200 truncate">{kf.label}</div>
+                        <div className="text-[10px] mono text-sky-400">t={kf.timestamp}s &bull; {(kf.confidence*100).toFixed(0)}%</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT PANE: DIAGNOSTIC KPI CARDS + COPILOT + CLINICAL REPORT */}
+            <div className="lg:col-span-6 flex flex-col gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Primary Finding</div>
+                  <div className="text-lg font-bold text-white mt-1 truncate">{metrics ? metrics.finding : "Awaiting Scan"}</div>
+                  <div className="text-xs text-sky-400 mono mt-0.5">
+                    {metrics ? `Confidence: ${(metrics.confidence * 100).toFixed(1)}%` : "Upload image/video"}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Epistemic Unc.</div>
+                  <div className="text-lg font-bold text-white mono mt-1">
+                    {metrics ? metrics.uncertainty.toFixed(3) : "—"}
+                  </div>
+                  <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full border mt-1 ${uncBadge(metrics?.uncertainty).cls}`}>
+                    ● {uncBadge(metrics?.uncertainty).label}
+                  </span>
+                </div>
+
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Lesion Mask Area</div>
+                  <div className="text-lg font-bold text-white mono mt-1">
+                    {metrics ? `${metrics.coverage.toFixed(2)}%` : "—"}
+                  </div>
+                  <div className="text-xs text-teal-400 mt-0.5 truncate">
+                    {metrics ? metrics.location : "No focal mask"}
+                  </div>
+                </div>
+              </div>
+
+              {metrics && (
+                <div className="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-2.5">
+                  <button
+                    onClick={() => setShowTelemetry(!showTelemetry)}
+                    className="w-full flex items-center justify-between text-xs font-semibold text-slate-300"
+                  >
+                    <span>Perception Telemetry</span>
+                    <span className="text-sky-400">{showTelemetry ? "Hide ▲" : "Inspect ▼"}</span>
+                  </button>
+                  {showTelemetry && (
+                    <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
+                      <div className="space-y-1.5">
+                        {(metrics.top3 || []).map((item, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            <span className="w-40 truncate text-slate-300 mono">{item.label}</span>
+                            <div className="flex-1 h-2 bg-slate-950 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-sky-500 to-teal-400" style={{ width: `${Math.min(100, item.prob * 100)}%` }}></div>
+                            </div>
+                            <span className="w-12 text-right mono text-slate-400">{(item.prob * 100).toFixed(1)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                      <pre className="text-[11px] mono bg-slate-950 p-3 rounded-lg text-slate-300 whitespace-pre-wrap border border-slate-800">
+                        {metrics.structured_context}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="bg-slate-900/75 border border-slate-800 rounded-2xl p-4 flex flex-col flex-1 min-h-[310px] shadow-xl">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Clinical Reasoning Copilot</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[260px]">
+                  {chatHistory.length === 0 && (
+                    <div className="text-xs text-slate-500 text-center py-10">
+                      Upload an endoscopy frame or video to start clinical analysis.
+                    </div>
+                  )}
+                  {chatHistory.map((m, idx) => (
+                    <div key={idx} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed whitespace-pre-wrap ${
+                        m.role === "user"
+                          ? "bg-sky-600 text-white"
+                          : "bg-slate-950 border border-slate-800 text-slate-200"
+                      }`}>
+                        {m.content}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {[
+                    "Interpret uncertainty score",
+                    "Assess lesion morphology & location",
+                    "Recommended clinical follow-up",
+                  ].map((chip, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => sendChatMessage(chip)}
+                      className="text-[11px] px-3 py-1 rounded-full bg-slate-950 hover:bg-slate-800 text-sky-300 border border-slate-800 transition"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex gap-2 mt-2.5">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && sendChatMessage()}
+                    placeholder="Ask about findings, differential, or uncertainty..."
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                  />
+                  <button
+                    onClick={() => sendChatMessage()}
+                    disabled={isStreaming}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-teal-600 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {isStreaming ? "..." : "Ask"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/75 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-xl">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Clinical Report</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={handleGenerateReport}
+                      disabled={isReporting}
+                      className="px-3.5 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-300 text-xs font-semibold transition"
+                    >
+                      {isReporting ? "Generating..." : "Generate Report"}
+                    </button>
+                    <button
+                      onClick={handleExportPdf}
+                      className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+                    >
+                      Export PDF
+                    </button>
+                  </div>
+                </div>
+
+                {reportText && (
+                  <textarea
+                    value={reportText}
+                    onChange={e => setReportText(e.target.value)}
+                    rows={4}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 leading-relaxed"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
