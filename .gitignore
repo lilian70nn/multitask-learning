@@ -1,0 +1,23 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# runtime output and caches
+/outputs/
+__pycache__/
+*.py[cod]
+*.log
+
+# weights and data (never commit)
+/model_weights/
+/data/
+*.pt
+*.pth
+*.safetensors
+*.mp4
+*.avi
+
+# environments and OS files
+.venv/
+.DS_Store

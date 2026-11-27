@@ -22,7 +22,7 @@ class VisualAdapter(nn.Module):
         self.proj = nn.Linear(vision_dim, llm_dim)
 
     def forward(self, z):
-        return self.proj(z)
+        return self.proj(z.to(self.proj.weight.dtype))
 
 
 class ClassificationAdapter(nn.Module):
@@ -31,7 +31,7 @@ class ClassificationAdapter(nn.Module):
         self.proj = nn.Linear(num_classes, llm_dim)
 
     def forward(self, probabilities):
-        return self.proj(probabilities).unsqueeze(1)
+        return self.proj(probabilities.to(self.proj.weight.dtype)).unsqueeze(1)
 
 
 class SegmentationAdapter(nn.Module):
@@ -43,7 +43,7 @@ class SegmentationAdapter(nn.Module):
     def forward(self, probabilities):
         x = F.adaptive_avg_pool2d(probabilities, (self.grid_size, self.grid_size))
         x = x.flatten(2).transpose(1, 2)
-        return self.proj(x)
+        return self.proj(x.to(self.proj.weight.dtype))
 
 
 
@@ -148,13 +148,16 @@ class CaptioningModel(nn.Module):
 
     def extract_features(self, images, cls_gt=None, seg_gt=None):
         with torch.no_grad():
-            z = self.vision_encoder.forward_features(images)
+            # The vision networks may run in fp16: feed them matching inputs and do
+            # every softmax / evidence computation on float32 logits.
+            vision_dtype = next(self.vision_encoder.parameters()).dtype
+            z = self.vision_encoder.forward_features(images.to(vision_dtype))
             cls_probs, seg_probs, cls_alpha, seg_alpha = None, None, None, None
 
             if self.cls_model is not None:
 
-                cls_logits = self.cls_model(images)
-                seg_logits = self.seg_model(images)
+                cls_logits = self.cls_model(images).float()
+                seg_logits = self.seg_model(images.to(next(self.seg_model.parameters()).dtype)).float()
                 if self.use_evidence:
                     cls_alpha = F.softplus(cls_logits) + 1.0
                     seg_alpha = F.softplus(seg_logits) + 1.0
@@ -287,19 +290,23 @@ def load_checkpoint(path, key=None):
     return checkpoint
 
 
-def load_captioning_model(args):
-    vision_encoder = timm.create_model("vit_base_patch16_224", pretrained=False, num_classes=0,)
-    vision_state = load_checkpoint(args.vit_ckpt, key="ema_backbone")
-    vision_encoder.load_state_dict(vision_state, strict=True)
+def load_captioning_model(args, vision_encoder=None, cls_model=None):
+    """Build the captioning model. Already loaded `vision_encoder` / `cls_model`
+    instances can be passed in to share them between several models."""
+    if vision_encoder is None:
+        vision_encoder = timm.create_model("vit_base_patch16_224", pretrained=False, num_classes=0,)
+        vision_state = load_checkpoint(args.vit_ckpt, key="ema_backbone")
+        vision_encoder.load_state_dict(vision_state, strict=True)
 
-    cls_model, seg_model, cls_classes, seg_classes = None, None, None, None
+    seg_model, cls_classes, seg_classes = None, None, None
 
     if args.baseline >= 2:
         if not args.cls_ckpt or not args.seg_ckpt:
             raise ValueError("Baseline 2/3 requires --cls_ckpt and --seg_ckpt.")
 
 
-        cls_model = HierarchicalClassifier(args.cls_ckpt, edl=(args.baseline == 3),)
+        if cls_model is None:
+            cls_model = HierarchicalClassifier(args.cls_ckpt, edl=(args.baseline == 3),)
         cls_classes = cls_model.num_classes
 
         seg_state = load_checkpoint(args.seg_ckpt)
@@ -308,6 +315,9 @@ def load_captioning_model(args):
         seg_model = ViTUNet(seg_backbone, num_classes=seg_classes)
         seg_model.load_state_dict(seg_state, strict=True)
 
+
+    if args.baseline < 2:
+        cls_model = None
 
     model = CaptioningModel(
         qwen_name=args.qwen_name,

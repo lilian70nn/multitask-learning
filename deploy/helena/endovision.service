@@ -1,0 +1,39 @@
+# systemd unit template for EndoVision AI.
+#
+# Replace __USER__, __REPO__ and __VENV__ before installing. install.sh prints the
+# exact command, which has this form:
+#
+#   sed -e 's|__USER__|alice|g' -e 's|__REPO__|/home/alice/multitask-learning|g' \
+#       -e 's|__VENV__|/home/alice/multitask-learning/.venv|g' \
+#       deploy/helena/endovision.service | sudo tee /etc/systemd/system/endovision.service
+#
+# Paths must not contain spaces.
+
+[Unit]
+Description=EndoVision AI (research demo, not for clinical use)
+After=network-online.target
+Wants=network-online.target
+# Never give up restarting.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__REPO__
+# These override .env: the app stays on localhost, behind Caddy.
+# server.py starts uvicorn (one process; sessions and the GPU lock live in memory,
+# so do not add workers). It reads __REPO__/.env itself.
+Environment=HOST=127.0.0.1
+Environment=PORT=7860
+Environment=PYTHONUNBUFFERED=1
+ExecStart=__VENV__/bin/python __REPO__/server.py
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

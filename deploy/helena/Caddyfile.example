@@ -1,0 +1,37 @@
+# Caddy (v2) reverse proxy for EndoVision AI: HTTPS on your domain, app on localhost.
+#
+# Before use:
+#   1. Replace demo.example.org with the real (sub)domain.
+#   2. Its DNS A/AAAA record must point to helena's public address.
+#   3. Ports 80 and 443 must be reachable (80 is needed for the certificate).
+# Then merge this block into /etc/caddy/Caddyfile (do not overwrite other sites).
+
+demo.example.org {
+	# Slightly above MAX_UPLOAD_MB=50, so the app itself returns the clear
+	# "file too large" error for files just over its limit.
+	request_body {
+		max_size 60MB
+	}
+
+	# The app already sends nosniff, frame and referrer headers. Do not add
+	# "Referrer-Policy no-referrer": browsers then send "Origin: null" on the login
+	# form and the app rejects it as cross-origin (HTTP 403).
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:7860 {
+		# Send chat tokens to the browser immediately (NDJSON streaming).
+		flush_interval -1
+		transport http {
+			dial_timeout 10s
+			# Video analysis and report generation answer only when they are done,
+			# and requests queue behind a single GPU lock.
+			response_header_timeout 15m
+			read_timeout 15m
+			write_timeout 15m
+		}
+	}
+}

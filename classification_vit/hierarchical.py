@@ -213,7 +213,7 @@ class HierarchicalClassifier(nn.Module):
         self.merge_groups = {int(group["group_id"]): group["class_indices"] for group in info["merge_groups"]}
 
         # Stage 1: load trained Coarse ViT
-        self.coarse = initialize_vit_classifier(num_classes=info["num_coarse_classes"], ckpt_path=None)
+        self.coarse = initialize_vit_classifier(num_classes=info["num_coarse_classes"], ckpt_path=None, pretrained=False)
         self.coarse.load_state_dict(
             torch.load(ckpt_dir / "coarse_best_model.pt", map_location="cpu", weights_only=True),
             strict=True,
@@ -233,6 +233,7 @@ class HierarchicalClassifier(nn.Module):
 
     def preprocess_swin(self, images):
         # Reverse Captioner's ImageNet normalization.
+        images = images.float()  # preprocessing is always done in float32
         mean = images.new_tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
         std = images.new_tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
         rgb = (images * std + mean).clamp(0, 1)
@@ -263,8 +264,8 @@ class HierarchicalClassifier(nn.Module):
 
     @torch.no_grad()
     def forward(self, images):
-        # Stage 1
-        coarse_logits = self.coarse(images)
+        # Stage 1 (the networks may run in fp16; all maths on their logits is float32)
+        coarse_logits = self.coarse(images.to(self.coarse.head.weight.dtype)).float()
 
         if self.edl:
             coarse_alpha = F.softplus(coarse_logits) + 1
@@ -289,7 +290,9 @@ class HierarchicalClassifier(nn.Module):
             if swin_images is None:
                 swin_images = self.preprocess_swin(images)
 
-            logits = self.specialists[str(group_id)](pixel_values=swin_images[indices]).logits
+            specialist = self.specialists[str(group_id)]
+            pixel_values = swin_images[indices].to(specialist.classifier.weight.dtype)
+            logits = specialist(pixel_values=pixel_values).logits.float()
             class_indices = torch.tensor(classes, dtype=torch.long, device=images.device)
             final_logits[indices[:, None], class_indices[None, :],] = logits
 

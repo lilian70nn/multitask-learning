@@ -28,9 +28,12 @@ class ViTClassifier(nn.Module):
         return self.head(features)
 
 
-def initialize_vit_classifier(num_classes, ckpt_path=None):
+def initialize_vit_classifier(num_classes, ckpt_path=None, pretrained=None):
 
-    backbone = timm.create_model("vit_base_patch16_224", pretrained=(ckpt_path is None), num_classes=0,)
+    # pretrained=False skips the ImageNet download when a full checkpoint is loaded afterwards.
+    if pretrained is None:
+        pretrained = ckpt_path is None
+    backbone = timm.create_model("vit_base_patch16_224", pretrained=pretrained, num_classes=0,)
     if ckpt_path is not None:
         with safe_globals([TorchVersion]):
             checkpoint = torch.load(
@@ -40,7 +43,7 @@ def initialize_vit_classifier(num_classes, ckpt_path=None):
             )
         backbone.load_state_dict(checkpoint["ema_backbone"], strict=True,)
         print(f"Loaded ViT backbone from: {ckpt_path}")
-    else:
+    elif pretrained:
         print("Loaded ImageNet pretrained ViT backbone")
 
     return ViTClassifier(backbone, num_classes)
